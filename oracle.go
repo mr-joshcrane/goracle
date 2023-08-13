@@ -1,5 +1,11 @@
 package oracle
 
-func Ask(question string) string {
+type Oracle struct{}
+
+func NewOracle() *Oracle {
+	return &Oracle{}
+}
+
+func (o *Oracle) Ask(question string) string {
 	return "42"
 }
