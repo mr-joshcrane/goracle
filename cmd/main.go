@@ -1,8 +1,17 @@
 package main
 
-import "github.com/oracle"
+import (
+	"fmt"
+
+	"github.com/mr-joshcrane/oracle"
+)
 
 func main() {
-	question := "What is the meaning of life?"
-	oracle.Ask(question)
+	question := "How much wood would a woodchuck chuck?"
+	o := oracle.NewOracle()
+	q, err := o.Ask(question)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(q)
 }
