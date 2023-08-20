@@ -1,111 +1,76 @@
 package oracle
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	// "github.com/mr-joshcrane/chatproxy"
+	"github.com/mr-joshcrane/oracle/client"
 )
 
-
-type Prompts []Prompt
-
 type Prompt struct {
-	Prompt     string
-	Completion string
+	Purpose  string
+	Examples Exemplars
+	Question string
 }
 
-func (p Prompts) String() string {
-	s := ""
-	for _, prompt := range p {
-		s += fmt.Sprintf("USER: %s\nBOT: %s\n", prompt.Prompt, prompt.Completion)
+func (p Prompt) GetPurpose() string {
+	return p.Purpose
+}
+
+func (p Prompt) GetExamples() []struct{ GivenInput, IdealOutput string } {
+	examples := []struct{ GivenInput, IdealOutput string }{}
+	for _, exemplar := range p.Examples {
+		examples = append(examples, struct{ GivenInput, IdealOutput string }{exemplar.GivenInput, exemplar.IdealOutput})
 	}
-	return s
+	return examples
+}
+
+func (p Prompt) GetQuestion() string {
+	return p.Question
+}
+
+type Exemplars []struct {
+	GivenInput  string
+	IdealOutput string
 }
 
 type Oracle struct {
 	purpose  string
-	examples []Prompt
+	examples Exemplars
+	client   *client.ChatGPTClient
 }
 
 func NewOracle() *Oracle {
+	client := client.NewChatGPTClient()
 	return &Oracle{
 		purpose:  "You are a helpful assistant",
-		examples: Prompts{},
+		examples: Exemplars{},
+		client:   client,
 	}
 }
 
-func (o *Oracle) Ask(question string) (string, error) {
-	token := os.Getenv("OPENAI_API_KEY")
-	req := CreateChatGPTRequest(token, []Message{
-		{
-			Role:    "user",
-			Content: question,
-		},
-	})
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
+func (o Oracle) GetPurpose() string {
+	return o.purpose
+}
+
+func (o Oracle) GetExamples() Exemplars {
+	return o.examples
+}
+
+func (o Oracle) Ask(question string) (string, error) {
+	prompt := o.GeneratePrompt(question)
+	return o.client.Completion(prompt)
+}
+
+func (o *Oracle) GeneratePrompt(question string) Prompt {
+	return Prompt{
+		Purpose:  o.purpose,
+		Examples: o.examples,
+		Question: question,
 	}
-	defer resp.Body.Close()
-	return ParseResponse(resp.Body)
 }
 
 func (o *Oracle) SetPurpose(purpose string) {
 	o.purpose = purpose
 }
 
-func (o *Oracle) GiveExamplePrompt(prompt string, idealCompletion string) {
-	o.examples = append(o.examples, Prompt{prompt, idealCompletion})
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type ChatCompletionRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-}
-
-type ChatCompletionResponse struct {
-	Choices []struct {
-		Message Message `json:"message"`
-	} `json:"choices"`
-}
-
-func CreateChatGPTRequest(token string, messages []Message) *http.Request {
-	buf := new(bytes.Buffer)
-	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
-		Model:    "gpt-3.5-turbo",
-		Messages: messages,
-	})
-	if err != nil {
-		panic(err)
-	}
-	req, err := http.NewRequest(http.MethodPost, "https://api.openai.com/v1/chat/completions", buf)
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	return req
-}
-
-func ParseResponse(r io.Reader) (string, error) {
-	resp := ChatCompletionResponse{}
-	err := json.NewDecoder(r).Decode(&resp)
-	if err != nil {
-		return "", err
-	}
-	if len(resp.Choices) < 1 {
-		return "", errors.New("No choices returned")
-	}
-	return resp.Choices[0].Message.Content, nil
+func (o *Oracle) GiveExamplePrompt(givenInput string, idealCompletion string) {
+	o.examples = append(o.examples, struct{ GivenInput, IdealOutput string }{givenInput, idealCompletion})
 }
