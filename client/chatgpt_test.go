@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mr-joshcrane/oracle"
 	"github.com/mr-joshcrane/oracle/client"
 )
 
@@ -62,8 +63,61 @@ func TestParseResponse(t *testing.T) {
 
 func TestNewChatGPTToken(t *testing.T) {
 	t.Parallel()
-	client := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
-	if client.Token != "dummy-token-openai" {
-		t.Errorf("Expected dummy-token-openai, got %s", client.Token)
+	c := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
+	if c.Token != "dummy-token-openai" {
+		t.Errorf("Expected dummy-token-openai, got %s", c.Token)
 	}
+}
+
+func TestMessageFromPrompt(t *testing.T) {
+	t.Parallel()
+	prompt := oracle.Prompt{}
+	msg := client.MessageFromPrompt(prompt)
+	if len(msg) != 2 {
+		t.Errorf("Expected 2 message, got %d ::: %v", len(msg), msg)
+	}
+	prompt.Purpose = "A test purpose"
+	prompt.Examples = oracle.Exemplars{
+		{
+			GivenInput:  "GivenInput",
+			IdealOutput: "IdealOutput",
+		},
+		{
+			GivenInput:  "GivenInput2",
+			IdealOutput: "IdealOutput2",
+		},
+	}
+	prompt.Question = "A test question"
+
+	want := []client.Message{
+		{
+			Role:    "system",
+			Content: "A test purpose",
+		},
+		{
+			Role:    "user",
+			Content: "GivenInput",
+		},
+		{
+			Role:    "assistant",
+			Content: "IdealOutput",
+		},
+		{
+			Role:    "user",
+			Content: "GivenInput2",
+		},
+		{
+			Role:    "assistant",
+			Content: "IdealOutput2",
+		},
+		{
+			Role:    "user",
+			Content: "A test question",
+		},
+	}
+	got := client.MessageFromPrompt(prompt)
+	if !cmp.Equal(want, got) {
+		t.Error(cmp.Diff(want, got))
+	}
+
 }
