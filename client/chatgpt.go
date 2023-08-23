@@ -15,20 +15,20 @@ const (
 	RoleAssistant = "assistant"
 )
 
-type ChatGPTClient struct {
+type ChatGPT struct {
 	Token string
 }
 
-type ClientOptions func(*ChatGPTClient)
+type ClientOptions func(*ChatGPT)
 
 func WithToken(token string) ClientOptions {
-	return func(c *ChatGPTClient) {
+	return func(c *ChatGPT) {
 		c.Token = token
 	}
 }
 
-func NewChatGPTClient(opts ...ClientOptions) *ChatGPTClient {
-	c := &ChatGPTClient{
+func NewChatGPT(opts ...ClientOptions) *ChatGPT {
+	c := &ChatGPT{
 		Token: os.Getenv("OPENAI_API_KEY"),
 	}
 	for _, opt := range opts {
@@ -66,7 +66,7 @@ func MessageFromPrompt(prompt Prompt) []Message {
 	return messages
 }
 
-func (c *ChatGPTClient) Completion(prompt Prompt) (string, error) {
+func (c *ChatGPT) Completion(prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
 	req := CreateChatGPTRequest(c.Token, messages)
 	resp, err := http.DefaultClient.Do(req)

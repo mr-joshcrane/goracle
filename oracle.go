@@ -31,14 +31,18 @@ type Exemplars []struct {
 	IdealOutput string
 }
 
+type LanguageModel interface {
+	Completion(prompt client.Prompt) (string, error)
+}
+
 type Oracle struct {
 	purpose  string
 	examples Exemplars
-	client   *client.ChatGPTClient
+	client   LanguageModel
 }
 
 func NewOracle() *Oracle {
-	client := client.NewChatGPTClient()
+	client := client.NewChatGPT()
 	return &Oracle{
 		purpose:  "You are a helpful assistant",
 		examples: Exemplars{},
@@ -53,12 +57,6 @@ func (o Oracle) GetPurpose() string {
 func (o Oracle) GetExamples() Exemplars {
 	return o.examples
 }
-
-func (o Oracle) Ask(question string) (string, error) {
-	prompt := o.GeneratePrompt(question)
-	return o.client.Completion(prompt)
-}
-
 func (o *Oracle) GeneratePrompt(question string) Prompt {
 	return Prompt{
 		Purpose:  o.purpose,
@@ -71,6 +69,11 @@ func (o *Oracle) SetPurpose(purpose string) {
 	o.purpose = purpose
 }
 
-func (o *Oracle) GiveExamplePrompt(givenInput string, idealCompletion string) {
+func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.examples = append(o.examples, struct{ GivenInput, IdealOutput string }{givenInput, idealCompletion})
+}
+
+func (o Oracle) Ask(question string) (string, error) {
+	prompt := o.GeneratePrompt(question)
+	return o.client.Completion(prompt)
 }
