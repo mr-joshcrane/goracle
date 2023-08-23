@@ -12,7 +12,10 @@ import (
 
 func TestGetChatCompletionsRequestHeaders(t *testing.T) {
 	t.Parallel()
-	req := client.CreateChatGPTRequest("dummy-token-openai", []client.Message{})
+	req, err := client.CreateChatGPTRequest("dummy-token-openai", []client.Message{})
+	if err != nil {
+		t.Errorf("Error creating request: %s", err)
+	}
 	auth := req.Header.Get("Authorization")
 	if auth != "Bearer dummy-token-openai" {
 		t.Errorf("Expected dummy-token-openai, got %s", auth)
@@ -32,7 +35,10 @@ func TestGetChatCompletionsRequestBody(t *testing.T) {
 		},
 	}
 
-	req := client.CreateChatGPTRequest("dummy-token-openai", messages)
+	req, err := client.CreateChatGPTRequest("dummy-token-openai", messages)
+	if err != nil {
+		t.Errorf("Error creating request: %s", err)
+	}
 	want := `{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"Say this is a test!"}]}` + "\n"
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -63,7 +69,7 @@ func TestParseResponse(t *testing.T) {
 
 func TestNewChatGPTToken(t *testing.T) {
 	t.Parallel()
-	c := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
+	c := client.NewChatGPT(client.WithToken("dummy-token-openai"))
 	if c.Token != "dummy-token-openai" {
 		t.Errorf("Expected dummy-token-openai, got %s", c.Token)
 	}
@@ -123,7 +129,7 @@ func TestMessageFromPrompt(t *testing.T) {
 
 func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
-	c := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
+	c := client.NewChatGPT(client.WithToken("dummy-token-openai"))
 	_, err := c.Completion(oracle.Prompt{})
 	if err == nil {
 		t.Errorf("Expected error, got nil")

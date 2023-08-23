@@ -19,15 +19,15 @@ type ChatGPT struct {
 	Token string
 }
 
-type ClientOptions func(*ChatGPT)
+type GPTOptions func(*ChatGPT)
 
-func WithToken(token string) ClientOptions {
+func WithToken(token string) GPTOptions {
 	return func(c *ChatGPT) {
 		c.Token = token
 	}
 }
 
-func NewChatGPT(opts ...ClientOptions) *ChatGPT {
+func NewChatGPT(opts ...GPTOptions) *ChatGPT {
 	c := &ChatGPT{
 		Token: os.Getenv("OPENAI_API_KEY"),
 	}
@@ -68,7 +68,10 @@ func MessageFromPrompt(prompt Prompt) []Message {
 
 func (c *ChatGPT) Completion(prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
-	req := CreateChatGPTRequest(c.Token, messages)
+	req, err := CreateChatGPTRequest(c.Token, messages)
+	if err != nil {
+		return "", err
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
@@ -96,23 +99,23 @@ type ChatCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func CreateChatGPTRequest(token string, messages []Message) *http.Request {
+func CreateChatGPTRequest(token string, messages []Message) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
 		Model:    "gpt-3.5-turbo",
 		Messages: messages,
 	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	req, err := http.NewRequest(http.MethodPost, "https://api.openai.com/v1/chat/completions", buf)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	return req
+	return req, nil
 }
 
 func ParseResponse(r io.Reader) (string, error) {

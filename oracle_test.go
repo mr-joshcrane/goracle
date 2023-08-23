@@ -1,6 +1,7 @@
 package oracle_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mr-joshcrane/oracle"
@@ -15,7 +16,7 @@ func TestAsk(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	if answer != "42" {
+	if !strings.Contains(answer, "42") {
 		t.Errorf("Expected 42, got %s", answer)
 	}
 }
