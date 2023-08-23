@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -122,7 +121,6 @@ func ParseResponse(r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(resp)
 	if len(resp.Choices) < 1 {
 		return "", errors.New("no choices returned")
 	}
