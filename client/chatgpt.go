@@ -20,11 +20,22 @@ type ChatGPTClient struct {
 	Token string
 }
 
-func NewChatGPTClient() *ChatGPTClient {
-	token := os.Getenv("OPENAI_API_KEY")
-	return &ChatGPTClient{
-		Token: token,
+type ClientOptions func(*ChatGPTClient)
+
+func WithToken(token string) ClientOptions {
+	return func(c *ChatGPTClient) {
+		c.Token = token
 	}
+}
+
+func NewChatGPTClient(opts ...ClientOptions) *ChatGPTClient {
+	c := &ChatGPTClient{
+		Token: os.Getenv("OPENAI_API_KEY"),
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 type Prompt interface {

@@ -59,3 +59,11 @@ func TestParseResponse(t *testing.T) {
 		t.Errorf("Expected %s', got %s", want, content)
 	}
 }
+
+func TestNewChatGPTToken(t *testing.T) {
+	t.Parallel()
+	client := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
+	if client.Token != "dummy-token-openai" {
+		t.Errorf("Expected dummy-token-openai, got %s", client.Token)
+	}
+}
