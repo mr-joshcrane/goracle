@@ -64,6 +64,8 @@ func NewOracle() *Oracle {
 	}
 }
 
+// GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
+// question the current question posed by the user.
 func (o *Oracle) GeneratePrompt(question string) Prompt {
 	return Prompt{
 		Purpose:  o.purpose,
@@ -72,14 +74,19 @@ func (o *Oracle) GeneratePrompt(question string) Prompt {
 	}
 }
 
+// SetPurpose sets the purpose of the Oracle, which frames the models response.
 func (o *Oracle) SetPurpose(purpose string) {
 	o.purpose = purpose
 }
 
+// GiveExample adds an example to the list of examples. These examples used to guide the models
+// response. Quality of the examples is more important than quantity here.
 func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.examples = append(o.examples, struct{ GivenInput, IdealOutput string }{givenInput, idealCompletion})
 }
 
+// Ask asks the Oracle a question, and returns the response from the underlying
+// Large Language Model.
 func (o Oracle) Ask(question string) (string, error) {
 	prompt := o.GeneratePrompt(question)
 	return o.client.Completion(prompt)
