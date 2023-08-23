@@ -77,7 +77,6 @@ func (c *ChatGPTClient) Completion(prompt Prompt) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("bad status code from openai" + resp.Status)
 	}
-	fmt.Println(resp)
 	defer resp.Body.Close()
 	return ParseResponse(resp.Body)
 }

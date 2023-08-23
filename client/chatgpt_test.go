@@ -119,5 +119,13 @@ func TestMessageFromPrompt(t *testing.T) {
 	if !cmp.Equal(want, got) {
 		t.Error(cmp.Diff(want, got))
 	}
+}
 
+func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
+	t.Parallel()
+	c := client.NewChatGPTClient(client.WithToken("dummy-token-openai"))
+	_, err := c.Completion(oracle.Prompt{})
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
 }
