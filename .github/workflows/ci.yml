@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: [stable]
+          go-version: stable
       - uses: actions/checkout@v3
       - run: go test -tags=integration ./...
         env: 
