@@ -1,3 +1,6 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/mr-joshcrane/oracle.svg)](https://pkg.go.dev/github.com/mr-joshcrane/oracle)[![License: GPL-2.0](https://img.shields.io/badge/Licence-GPL-2)](https://opensource.org/licenses/GPL-2.0)[![Go Report Card](https://goreportcard.com/badge/github.com/mr-joshcrane/oracle)](https://goreportcard.com/report/github.com/mr-joshcrane/oracle)
+
+
 # Oracle
 
 Oracle is a Go library that provides an easy way to integrate OpenAI's GPT-3 into your application. Whether you need to generate text, answer questions, create conversational agents, or more, Oracle has got you covered.
