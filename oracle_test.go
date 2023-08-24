@@ -16,9 +16,13 @@ func TestGeneratePrompt_GeneratesExpectedPrompt(t *testing.T) {
 	got := o.GeneratePrompt("4")
 	want := oracle.Prompt{
 		Purpose: "To answer if a number is odd or even in a specific format",
-		Examples: map[string]string{
-			"2": "+++even+++",
-			"3": "---odd---",
+		ExampleInputs: []string{
+			"2",
+			"3",
+		},
+		IdealOutputs: []string{
+			"+++even+++",
+			"---odd---",
 		},
 		Question: "4",
 	}

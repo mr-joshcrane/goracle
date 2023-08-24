@@ -8,7 +8,8 @@ import (
 // that are ideal for Large Language Models.
 type Prompt struct {
 	Purpose  string
-	Examples map[string]string
+	ExampleInputs []string
+	IdealOutputs  []string
 	Question string
 }
 
@@ -19,8 +20,8 @@ func (p Prompt) GetPurpose() string {
 
 // GetExamples returns a list of examples that are used to guide the Models
 // response. Quality of the examples is more important than quantity here.
-func (p Prompt) GetExamples() map[string]string {
-	return p.Examples
+func (p Prompt) GetExamples() ([]string, []string) {
+	return p.ExampleInputs, p.IdealOutputs
 }
 
 // GetQuestion returns the question that the user is asking the Model
@@ -39,7 +40,8 @@ type LanguageModel interface {
 // Language Model.
 type Oracle struct {
 	purpose  string
-	examples map[string]string
+	exampleInputs []string
+	idealOutputs []string
 	client   LanguageModel
 }
 
@@ -48,7 +50,6 @@ func NewOracle(token string) *Oracle {
 	client := client.NewChatGPT(token)
 	return &Oracle{
 		purpose:  "You are a helpful assistant",
-		examples: map[string]string{},
 		client:   client,
 	}
 }
@@ -58,7 +59,8 @@ func NewOracle(token string) *Oracle {
 func (o *Oracle) GeneratePrompt(question string) Prompt {
 	return Prompt{
 		Purpose:  o.purpose,
-		Examples: o.examples,
+		ExampleInputs: o.exampleInputs,
+		IdealOutputs: o.idealOutputs,
 		Question: question,
 	}
 }
@@ -71,7 +73,8 @@ func (o *Oracle) SetPurpose(purpose string) {
 // GiveExample adds an example to the list of examples. These examples used to guide the models
 // response. Quality of the examples is more important than quantity here.
 func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
-	o.examples[givenInput] = idealCompletion
+	o.exampleInputs = append(o.exampleInputs, givenInput)
+	o.idealOutputs = append(o.idealOutputs, idealCompletion)
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
