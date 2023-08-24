@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
 )
 
 const (
@@ -19,22 +18,10 @@ type ChatGPT struct {
 	Token string
 }
 
-type GPTOptions func(*ChatGPT)
-
-func WithToken(token string) GPTOptions {
-	return func(c *ChatGPT) {
-		c.Token = token
+func NewChatGPT(token string) *ChatGPT {
+	return &ChatGPT{
+		Token: token,
 	}
-}
-
-func NewChatGPT(opts ...GPTOptions) *ChatGPT {
-	c := &ChatGPT{
-		Token: os.Getenv("OPENAI_API_KEY"),
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
 }
 
 type Prompt interface {

@@ -69,7 +69,7 @@ func TestParseResponse(t *testing.T) {
 
 func TestNewChatGPTToken(t *testing.T) {
 	t.Parallel()
-	c := client.NewChatGPT(client.WithToken("dummy-token-openai"))
+	c := client.NewChatGPT("dummy-token-openai")
 	if c.Token != "dummy-token-openai" {
 		t.Errorf("Expected dummy-token-openai, got %s", c.Token)
 	}
@@ -124,7 +124,7 @@ func TestMessageFromPrompt(t *testing.T) {
 
 func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
-	c := client.NewChatGPT(client.WithToken("dummy-token-openai"))
+	c := client.NewChatGPT("dummy-token-openai")
 	_, err := c.Completion(oracle.Prompt{})
 	if err == nil {
 		t.Errorf("Expected error, got nil")

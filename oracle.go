@@ -44,8 +44,8 @@ type Oracle struct {
 }
 
 // NewOracle returns a new Oracle with sensible defaults.
-func NewOracle() *Oracle {
-	client := client.NewChatGPT()
+func NewOracle(token string) *Oracle {
+	client := client.NewChatGPT(token)
 	return &Oracle{
 		purpose:  "You are a helpful assistant",
 		examples: map[string]string{},
@@ -78,5 +78,9 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 // Large Language Model.
 func (o Oracle) Ask(question string) (string, error) {
 	prompt := o.GeneratePrompt(question)
+	return o.Completion(prompt)
+}
+
+func (o Oracle) Completion(prompt Prompt) (string, error) {
 	return o.client.Completion(prompt)
 }

@@ -1,40 +1,28 @@
 package oracle_test
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
 )
 
-func TestAsk(t *testing.T) {
+func TestGeneratePrompt_GeneratesExpectedPrompt(t *testing.T) {
 	t.Parallel()
-	oracle := oracle.NewOracle()
-	oracle.SetPurpose("You always answer questions with the number 42.")
-	question := "What is the meaning of life?"
-	answer, err := oracle.Ask(question)
-	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+	o := oracle.NewOracle("dummy-token-openai")
+	o.SetPurpose("To answer if a number is odd or even in a specific format")
+	o.GiveExample("2", "+++even+++")
+	o.GiveExample("3", "---odd---")
+	got := o.GeneratePrompt("4")
+	want := oracle.Prompt{
+		Purpose: "To answer if a number is odd or even in a specific format",
+		Examples: map[string]string{
+			"2": "+++even+++",
+			"3": "---odd---",
+		},
+		Question: "4",
 	}
-	if !strings.Contains(answer, "42") {
-		t.Errorf("Expected 42, got %s", answer)
-	}
-}
-
-func TestGiveExample(t *testing.T) {
-	t.Parallel()
-	oracle := oracle.NewOracle()
-	oracle.SetPurpose("To answer if a number is odd or even in a specific format")
-	oracle.GiveExample("2", "+++even+++")
-	oracle.GiveExample("3", "---odd---")
-	oracle.GiveExample("4", "+++even+++")
-	oracle.GiveExample("5", "---odd---")
-	answer, err := oracle.Ask("6")
-	if err != nil {
-		t.Errorf("Error asking question: %s", err)
-	}
-
-	if answer != "+++even+++" {
-		t.Errorf("Expected +++even+++, got %s", answer)
+	if !cmp.Equal(want, got) {
+		t.Error(cmp.Diff(want, got))
 	}
 }
