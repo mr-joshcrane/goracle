@@ -39,7 +39,7 @@ func NewChatGPT(opts ...GPTOptions) *ChatGPT {
 
 type Prompt interface {
 	GetPurpose() string
-	GetExamples() []struct{ GivenInput, IdealOutput string }
+	GetExamples() map[string]string
 	GetQuestion() string
 }
 
@@ -49,14 +49,14 @@ func MessageFromPrompt(prompt Prompt) []Message {
 		Role:    RoleSystem,
 		Content: prompt.GetPurpose(),
 	})
-	for _, example := range prompt.GetExamples() {
+	for givenInput, idealOutput := range prompt.GetExamples() {
 		messages = append(messages, Message{
 			Role:    RoleUser,
-			Content: example.GivenInput,
+			Content: givenInput,
 		})
 		messages = append(messages, Message{
 			Role:    RoleAssistant,
-			Content: example.IdealOutput,
+			Content: idealOutput,
 		})
 	}
 	messages = append(messages, Message{

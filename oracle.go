@@ -8,7 +8,7 @@ import (
 // that are ideal for Large Language Models.
 type Prompt struct {
 	Purpose  string
-	Examples Exemplars
+	Examples map[string]string
 	Question string
 }
 
@@ -19,24 +19,13 @@ func (p Prompt) GetPurpose() string {
 
 // GetExamples returns a list of examples that are used to guide the Models
 // response. Quality of the examples is more important than quantity here.
-func (p Prompt) GetExamples() []struct{ GivenInput, IdealOutput string } {
-	examples := []struct{ GivenInput, IdealOutput string }{}
-	for _, exemplar := range p.Examples {
-		examples = append(examples, struct{ GivenInput, IdealOutput string }{exemplar.GivenInput, exemplar.IdealOutput})
-	}
-	return examples
+func (p Prompt) GetExamples() map[string]string {
+	return p.Examples
 }
 
 // GetQuestion returns the question that the user is asking the Model
 func (p Prompt) GetQuestion() string {
 	return p.Question
-}
-
-// Exemplars is a list of zero or more examples that are used to guide the
-// Models response. Quality of the examples is more important than quantity
-type Exemplars []struct {
-	GivenInput  string
-	IdealOutput string
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of are
@@ -50,7 +39,7 @@ type LanguageModel interface {
 // Language Model.
 type Oracle struct {
 	purpose  string
-	examples Exemplars
+	examples map[string]string
 	client   LanguageModel
 }
 
@@ -59,7 +48,7 @@ func NewOracle() *Oracle {
 	client := client.NewChatGPT()
 	return &Oracle{
 		purpose:  "You are a helpful assistant",
-		examples: Exemplars{},
+		examples: map[string]string{},
 		client:   client,
 	}
 }
@@ -82,7 +71,7 @@ func (o *Oracle) SetPurpose(purpose string) {
 // GiveExample adds an example to the list of examples. These examples used to guide the models
 // response. Quality of the examples is more important than quantity here.
 func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
-	o.examples = append(o.examples, struct{ GivenInput, IdealOutput string }{givenInput, idealCompletion})
+	o.examples[givenInput] = idealCompletion
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying

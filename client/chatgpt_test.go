@@ -83,16 +83,11 @@ func TestMessageFromPrompt(t *testing.T) {
 		t.Errorf("Expected 2 message, got %d ::: %v", len(msg), msg)
 	}
 	prompt.Purpose = "A test purpose"
-	prompt.Examples = oracle.Exemplars{
-		{
-			GivenInput:  "GivenInput",
-			IdealOutput: "IdealOutput",
-		},
-		{
-			GivenInput:  "GivenInput2",
-			IdealOutput: "IdealOutput2",
-		},
+	prompt.Examples = map[string]string{
+		"GivenInput":  "IdealOutput",
+		"GivenInput2": "IdealOutput2",
 	}
+
 	prompt.Question = "A test question"
 
 	want := []client.Message{
