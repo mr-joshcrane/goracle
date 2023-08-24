@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mr-joshcrane/oracle"
 )
@@ -11,7 +12,7 @@ func main() {
 	o := oracle.NewOracle()
 	q, err := o.Ask(question)
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, err)
 	}
-	fmt.Println(q)
+	fmt.Fprintln(os.Stdout, q)
 }
