@@ -7,10 +7,10 @@ import (
 // Prompt is a struct that scaffolds a well formed prompt, designed in a way
 // that are ideal for Large Language Models.
 type Prompt struct {
-	Purpose  string
+	Purpose       string
 	ExampleInputs []string
 	IdealOutputs  []string
-	Question string
+	Question      string
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -39,29 +39,43 @@ type LanguageModel interface {
 // that facilitates the asking of one or many questions to an underlying Large
 // Language Model.
 type Oracle struct {
-	purpose  string
+	purpose       string
 	exampleInputs []string
-	idealOutputs []string
-	client   LanguageModel
+	idealOutputs  []string
+	client        LanguageModel
+}
+
+// Options is a function that modifies the Oracle.
+type Option func(*Oracle) *Oracle
+
+func WithDummyClient(fixedResponse string) Option {
+	return func(o *Oracle) *Oracle {
+		o.client = client.NewDummyClient(fixedResponse)
+		return o
+	}
 }
 
 // NewOracle returns a new Oracle with sensible defaults.
-func NewOracle(token string) *Oracle {
+func NewOracle(token string, opts ...Option) *Oracle {
 	client := client.NewChatGPT(token)
-	return &Oracle{
-		purpose:  "You are a helpful assistant",
-		client:   client,
+	o := &Oracle{
+		purpose: "You are a helpful assistant",
+		client:  client,
 	}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
 }
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
 func (o *Oracle) GeneratePrompt(question string) Prompt {
 	return Prompt{
-		Purpose:  o.purpose,
+		Purpose:       o.purpose,
 		ExampleInputs: o.exampleInputs,
-		IdealOutputs: o.idealOutputs,
-		Question: question,
+		IdealOutputs:  o.idealOutputs,
+		Question:      question,
 	}
 }
 

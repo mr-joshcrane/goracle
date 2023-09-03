@@ -18,9 +18,23 @@ type ChatGPT struct {
 	Token string
 }
 
+type Dummy struct {
+	FixedResponse string
+}
+
+func (d *Dummy) Completion(prompt Prompt) (string, error) {
+	return d.FixedResponse, nil
+}
+
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
+	}
+}
+
+func NewDummyClient(fixedResponse string) *Dummy {
+	return &Dummy{
+		FixedResponse: fixedResponse,
 	}
 }
 
