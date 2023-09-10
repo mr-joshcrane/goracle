@@ -57,8 +57,8 @@ func TestParseResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	content, err := client.ParseResponse(f)
-	if err.Error() != "" {
+	content, cErr := client.ParseResponse(f)
+	if cErr != nil {
 		t.Errorf("Error parsing response: %s", err)
 	}
 	want := "A woodchuck would chuck as much wood as a woodchuck could chuck if a woodchuck could chuck wood."
