@@ -46,7 +46,7 @@ func (c ClientError) StatusCode() int {
 	return c.statusCode
 }
 
-func ErrorRateLimitExceeded(r http.Response) ClientError {
+func ErrorRateLimitExceeded(r http.Response) *ClientError {
 	rateLimit := ParseRateLimit(r)
 	var retryIn time.Duration
 	if rateLimit.TokensRemaining == 0 {
@@ -54,29 +54,29 @@ func ErrorRateLimitExceeded(r http.Response) ClientError {
 	} else if rateLimit.RequestsRemaining == 0 {
 		retryIn = rateLimit.ResetReq
 	}
-	return ClientError{
+	return &ClientError{
 		err:           errors.New("rate limit exceeded"),
 		statusCode:    429,
 		retryInterval: retryIn,
 	}
 }
 
-func ErrorBadRequest() ClientError {
-	return ClientError{
+func ErrorBadRequest() *ClientError {
+	return &ClientError{
 		err:        errors.New("bad request"),
 		statusCode: 400,
 	}
 }
 
-func ErrorUnauthorized() ClientError {
-	return ClientError{
+func ErrorUnauthorized() *ClientError {
+	return &ClientError{
 		err:        errors.New("unauthorized"),
 		statusCode: 401,
 	}
 }
 
-func GenericError(err error) ClientError {
-	return ClientError{
+func GenericError(err error) *ClientError {
+	return &ClientError{
 		err:        err,
 		statusCode: 500,
 	}

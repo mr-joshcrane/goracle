@@ -22,8 +22,8 @@ type Dummy struct {
 	FixedResponse string
 }
 
-func (d *Dummy) Completion(prompt Prompt) (string, ClientError) {
-	return d.FixedResponse, ClientError{}
+func (d *Dummy) Completion(prompt Prompt) (string, *ClientError) {
+	return d.FixedResponse, nil
 }
 
 func NewChatGPT(token string) *ChatGPT {
@@ -68,7 +68,7 @@ func MessageFromPrompt(prompt Prompt) []Message {
 	return messages
 }
 
-func (c *ChatGPT) Completion(prompt Prompt) (string, ClientError) {
+func (c *ChatGPT) Completion(prompt Prompt) (string, *ClientError) {
 	messages := MessageFromPrompt(prompt)
 	req, err := CreateChatGPTRequest(c.Token, messages)
 	if err != nil {
@@ -90,7 +90,7 @@ func (c *ChatGPT) Completion(prompt Prompt) (string, ClientError) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", ClientError{
+		return "", &ClientError{
 			err:        errors.New("unknown error"),
 			statusCode: resp.StatusCode,
 		}
@@ -143,7 +143,7 @@ func CreateChatGPTRequest(token string, messages []Message) (*http.Request, erro
 	return req, nil
 }
 
-func ParseResponse(r io.Reader) (string, ClientError) {
+func ParseResponse(r io.Reader) (string, *ClientError) {
 	resp := ChatCompletionResponse{}
 	err := json.NewDecoder(r).Decode(&resp)
 	if err != nil {
@@ -152,5 +152,5 @@ func ParseResponse(r io.Reader) (string, ClientError) {
 	if len(resp.Choices) < 1 {
 		return "", GenericError(errors.New("no choices returned"))
 	}
-	return resp.Choices[0].Message.Content, ClientError{}
+	return resp.Choices[0].Message.Content, nil
 }

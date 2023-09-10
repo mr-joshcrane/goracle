@@ -34,7 +34,7 @@ func (p Prompt) GetQuestion() string {
 // LanguageModel is an interface that abstracts a concrete implementation of are
 // language model API call.
 type LanguageModel interface {
-	Completion(prompt client.Prompt) (string, client.ClientError)
+	Completion(prompt client.Prompt) (string, *client.ClientError)
 }
 
 type ClientError interface {
