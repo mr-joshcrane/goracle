@@ -57,8 +57,8 @@ func TestParseResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	content, cErr := client.ParseResponse(f)
-	if cErr.Error() != nil {
+	content, err := client.ParseResponse(f)
+	if err.Error() != "" {
 		t.Errorf("Error parsing response: %s", err)
 	}
 	want := "A woodchuck would chuck as much wood as a woodchuck could chuck if a woodchuck could chuck wood."
@@ -125,7 +125,7 @@ func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
 	c := client.NewChatGPT("dummy-token-openai")
 	_, err := c.Completion(oracle.Prompt{})
-	if err.Error() == nil {
-		t.Errorf("Expected error, got nil")
+	if err.Error() == "" {
+		t.Errorf("Expected error, got %s", err.Error())
 	}
 }

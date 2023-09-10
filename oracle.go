@@ -38,7 +38,7 @@ type LanguageModel interface {
 }
 
 type ClientError interface {
-	Error() error
+	Error() string
 	StatusCode() int
 	RetryIn() time.Duration
 }

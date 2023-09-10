@@ -31,8 +31,11 @@ func ParseRateLimit(resp http.Response) RateLimit {
 	return r
 }
 
-func (c ClientError) Error() error {
-	return c.err
+func (c ClientError) Error() string {
+	if c.err == nil {
+		return ""
+	}
+	return c.err.Error()
 }
 
 func (c ClientError) RetryIn() time.Duration {
