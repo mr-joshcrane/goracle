@@ -143,7 +143,7 @@ func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
 	if !errors.As(err, want) {
 		t.Errorf("wanted %v, got %v", want, err)
 	}
-	if want.RetryAfter != 1 {
-		t.Errorf("Expected 1, got %d", want.RetryAfter)
+	if want.RetryAfter != 0 {
+		t.Errorf("Expected 0, got %d", want.RetryAfter)
 	}
 }

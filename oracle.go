@@ -48,9 +48,9 @@ type Oracle struct {
 // Options is a function that modifies the Oracle.
 type Option func(*Oracle) *Oracle
 
-func WithDummyClient(fixedResponse string) Option {
+func WithDummyClient(fixedResponse string, responseCode int) Option {
 	return func(o *Oracle) *Oracle {
-		o.client = client.NewDummyClient(fixedResponse)
+		o.client = client.NewDummyClient(fixedResponse, responseCode)
 		return o
 	}
 }
