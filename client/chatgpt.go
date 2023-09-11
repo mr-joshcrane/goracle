@@ -3,7 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -22,7 +22,7 @@ type Dummy struct {
 	FixedResponse string
 }
 
-func (d *Dummy) Completion(prompt Prompt) (string, *ClientError) {
+func (d *Dummy) Completion(prompt Prompt) (string, error) {
 	return d.FixedResponse, nil
 }
 
@@ -68,32 +68,18 @@ func MessageFromPrompt(prompt Prompt) []Message {
 	return messages
 }
 
-func (c *ChatGPT) Completion(prompt Prompt) (string, *ClientError) {
+func (c *ChatGPT) Completion(prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
 	req, err := CreateChatGPTRequest(c.Token, messages)
 	if err != nil {
-		return "", GenericError(err)
+		return "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", GenericError(err)
+		return "", err
 	}
-	if resp.StatusCode == http.StatusBadRequest {
-		return "", ErrorBadRequest()
-	}
-	if resp.StatusCode == http.StatusUnauthorized {
-		return "", ErrorUnauthorized()
-	}
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return "", ErrorRateLimitExceeded(*resp)
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		return "", &ClientError{
-			err:        errors.New("unknown error"),
-			statusCode: resp.StatusCode,
-		}
+		return "", NewClientError(resp)
 	}
 	defer resp.Body.Close()
 	return ParseResponse(resp.Body)
@@ -115,15 +101,6 @@ type ChatCompletionResponse struct {
 	} `json:"choices"`
 }
 
-// You can expect to see the following header fields:
-// Field	Sample Value	Description
-// x-ratelimit-limit-requests	60	The maximum number of requests that are permitted before exhausting the rate limit.
-// x-ratelimit-limit-tokens	150000	The maximum number of tokens that are permitted before exhausting the rate limit.
-// x-ratelimit-remaining-requests	59	The remaining number of requests that are permitted before exhausting the rate limit.
-// x-ratelimit-remaining-tokens	149984	The remaining number of tokens that are permitted before exhausting the rate limit.
-// x-ratelimit-reset-requests	1s	The time until the rate limit (based on requests) resets to its initial state.
-// x-ratelimit-reset-tokens	6m0s	The time until the rate limit (based on tokens) resets to its initial state.
-
 func CreateChatGPTRequest(token string, messages []Message) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
@@ -143,14 +120,14 @@ func CreateChatGPTRequest(token string, messages []Message) (*http.Request, erro
 	return req, nil
 }
 
-func ParseResponse(r io.Reader) (string, *ClientError) {
+func ParseResponse(r io.Reader) (string, error) {
 	resp := ChatCompletionResponse{}
 	err := json.NewDecoder(r).Decode(&resp)
 	if err != nil {
-		return "", GenericError(err)
+		return "", err
 	}
 	if len(resp.Choices) < 1 {
-		return "", GenericError(errors.New("no choices returned"))
+		return "", fmt.Errorf("no choices returned")
 	}
 	return resp.Choices[0].Message.Content, nil
 }

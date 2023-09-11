@@ -2,82 +2,87 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 )
 
 type ClientError struct {
-	err           error
-	statusCode    int
-	retryInterval time.Duration
+	Status     string
+	StatusCode int
 }
 
-type RateLimit struct {
+func (e ClientError) Error() string {
+	return fmt.Sprintf("Client error: %s", e.Status)
+}
+
+type RateLimitError struct {
+	RetryAfter time.Duration
+}
+
+func (e RateLimitError) Error() string {
+	return fmt.Sprintf("Rate limit exceeded. Retry after %s", e.RetryAfter)
+}
+
+type BadRequestError struct {
+	RequestTokens int
+	TokenLimit    int
+}
+
+func (e BadRequestError) Error() string {
+	return fmt.Sprintf("Bad request. Requested %d tokens, limit is %d", e.RequestTokens, e.TokenLimit)
+}
+
+type rateLimit struct {
 	ResetReq          time.Duration
 	ResetTkns         time.Duration
 	TokensRemaining   int
 	RequestsRemaining int
 }
 
-func ParseRateLimit(resp http.Response) RateLimit {
-	var r RateLimit
-	r.ResetReq, _ = time.ParseDuration(resp.Header.Get("X-RateLimit-Reset-Requests"))
-	r.ResetTkns, _ = time.ParseDuration(resp.Header.Get("X-RateLimit-Reset-Token"))
-	remainingRequests := resp.Header.Get("X-RateLimit-Remaining-Requests")
-	r.TokensRemaining, _ = strconv.Atoi(remainingRequests)
-	remainingTokens := resp.Header.Get("X-RateLimit-Remaining-Tokens")
-	r.TokensRemaining, _ = strconv.Atoi(remainingTokens)
+func parseRateLimit(resp http.Response) rateLimit {
+	var r rateLimit
 	return r
 }
 
-func (c ClientError) Error() string {
-	if c.err == nil {
-		return ""
-	}
-	return c.err.Error()
-}
-
-func (c ClientError) RetryIn() time.Duration {
-	return c.retryInterval
-}
-
-func (c ClientError) StatusCode() int {
-	return c.statusCode
-}
-
-func ErrorRateLimitExceeded(r http.Response) *ClientError {
-	rateLimit := ParseRateLimit(r)
+func errorRateLimitExceeded(r http.Response) error {
+	rateLimit := parseRateLimit(r)
 	var retryIn time.Duration
 	if rateLimit.TokensRemaining == 0 {
 		retryIn = rateLimit.ResetTkns
 	} else if rateLimit.RequestsRemaining == 0 {
 		retryIn = rateLimit.ResetReq
 	}
-	return &ClientError{
-		err:           errors.New("rate limit exceeded"),
-		statusCode:    429,
-		retryInterval: retryIn,
+	rle := RateLimitError{
+		RetryAfter: retryIn,
 	}
+	ce := ClientError{
+		Status:     r.Status,
+		StatusCode: http.StatusTooManyRequests,
+	}
+	return errors.Join(rle, ce)
+}
+func errorBadRequest(r http.Response) error {
+	brqe := BadRequestError{
+		RequestTokens: 0,
+		TokenLimit:    0,
+	}
+	ce := ClientError{
+		Status:     r.Status,
+		StatusCode: http.StatusBadRequest,
+	}
+	return errors.Join(brqe, ce)
 }
 
-func ErrorBadRequest() *ClientError {
-	return &ClientError{
-		err:        errors.New("bad request"),
-		statusCode: 400,
+func NewClientError(r *http.Response) error {
+	if r.StatusCode == http.StatusBadRequest {
+		return errorBadRequest(*r)
 	}
-}
-
-func ErrorUnauthorized() *ClientError {
-	return &ClientError{
-		err:        errors.New("unauthorized"),
-		statusCode: 401,
+	if r.StatusCode == http.StatusTooManyRequests {
+		return errorRateLimitExceeded(*r)
 	}
-}
-
-func GenericError(err error) *ClientError {
-	return &ClientError{
-		err:        err,
-		statusCode: 500,
-	}
+	return fmt.Errorf("%w", ClientError{
+		Status:     r.Status,
+		StatusCode: r.StatusCode,
+	})
 }

@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -125,7 +126,11 @@ func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
 	c := client.NewChatGPT("dummy-token-openai")
 	_, err := c.Completion(oracle.Prompt{})
-	if err.Error() == "" {
-		t.Errorf("Expected error, got %s", err.Error())
+	want := &client.ClientError{}
+	if !errors.As(err, want) {
+		t.Errorf("Expected %v, got %v", want, err)
+	}
+	if want.StatusCode != 401 {
+		t.Errorf("Expected 401, got %d", want.StatusCode)
 	}
 }
