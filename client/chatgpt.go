@@ -19,11 +19,19 @@ type ChatGPT struct {
 }
 
 type Dummy struct {
-	FixedResponse string
+	FixedResponse  string
+	FixedHTTPError int
 }
 
 func (d *Dummy) Completion(prompt Prompt) (string, error) {
-	return d.FixedResponse, nil
+	if d.FixedHTTPError == 200 {
+		return d.FixedResponse, nil
+	}
+	response := http.Response{
+		Status:     "client error",
+		StatusCode: d.FixedHTTPError,
+	}
+	return "", NewClientError(&response)
 }
 
 func NewChatGPT(token string) *ChatGPT {
@@ -32,9 +40,10 @@ func NewChatGPT(token string) *ChatGPT {
 	}
 }
 
-func NewDummyClient(fixedResponse string) *Dummy {
+func NewDummyClient(fixedResponse string, errorCode int) *Dummy {
 	return &Dummy{
-		FixedResponse: fixedResponse,
+		FixedResponse:  fixedResponse,
+		FixedHTTPError: errorCode,
 	}
 }
 

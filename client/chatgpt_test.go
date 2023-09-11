@@ -134,3 +134,16 @@ func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 		t.Errorf("Expected 401, got %d", want.StatusCode)
 	}
 }
+
+func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
+	t.Parallel()
+	c := client.NewDummyClient("response", 429)
+	_, err := c.Completion(oracle.Prompt{})
+	want := &client.RateLimitError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.RetryAfter != 1 {
+		t.Errorf("Expected 1, got %d", want.RetryAfter)
+	}
+}
