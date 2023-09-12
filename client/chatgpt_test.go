@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -158,8 +159,8 @@ func TestCompletionWithBadRequestReturnsTokenLength(t *testing.T) {
 	if !errors.As(err, want) {
 		t.Errorf("wanted %v, got %v", want, err)
 	}
-	if want.RequestTokens != 0 {
-		t.Errorf("Expected 0, got %d", want.RequestTokens)
+	if want.PromptTokens != 0 {
+		t.Errorf("Expected 0, got %d", want.PromptTokens)
 	}
 	if want.TokenLimit != 0 {
 		t.Errorf("Expected 0, got %d", want.TokenLimit)
@@ -220,5 +221,31 @@ func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T
 	}
 	if want.RetryAfter != time.Duration(17*time.Millisecond) {
 		t.Errorf("Expected 17ms, got %d", want.RetryAfter)
+	}
+}
+
+func TestParseResponseForUsageMetrics(t *testing.T) {
+	t.Parallel()
+	f, fErr := os.Open("testdata/response.json")
+	if fErr != nil {
+		t.Fatal(fErr)
+	}
+	defer f.Close()
+	data, fErr := io.ReadAll(f)
+	if fErr != nil {
+		t.Fatal(fErr)
+	}
+	var resp http.Response
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+	err := client.ErrorBadRequest(resp)
+	want := &client.BadRequestError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.PromptTokens != 17 {
+		t.Errorf("Expected 17, got %d", want.PromptTokens)
+	}
+	if want.TotalTokens != 42 {
+		t.Errorf("Expected 42, got %d", want.TotalTokens)
 	}
 }

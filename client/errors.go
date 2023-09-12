@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -25,12 +26,13 @@ func (e RateLimitError) Error() string {
 }
 
 type BadRequestError struct {
-	RequestTokens int
-	TokenLimit    int
+	PromptTokens int
+	TotalTokens  int
+	TokenLimit   int
 }
 
 func (e BadRequestError) Error() string {
-	return fmt.Sprintf("Bad request. Requested %d tokens, limit is %d", e.RequestTokens, e.TokenLimit)
+	return fmt.Sprintf("Bad request. Requested %d tokens, limit is %d", e.PromptTokens, e.TokenLimit)
 }
 
 type rateLimit struct {
@@ -73,10 +75,27 @@ func ErrorRateLimitExceeded(r http.Response) error {
 		StatusCode: http.StatusTooManyRequests,
 	}, err)
 }
-func errorBadRequest(r http.Response) error {
+
+//	"usage": {
+//	  "prompt_tokens": 17,
+//	  "completion_tokens": 25,
+//	  "total_tokens": 42
+//	}
+func ErrorBadRequest(r http.Response) error {
+	usage := struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	}{}
+	err := json.NewDecoder(r.Body).Decode(&usage)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
 	brqe := BadRequestError{
-		RequestTokens: 0,
-		TokenLimit:    0,
+		PromptTokens: usage.PromptTokens,
+		TotalTokens:  usage.TotalTokens,
+		TokenLimit:   8192,
 	}
 	ce := ClientError{
 		Status:     r.Status,
@@ -87,7 +106,7 @@ func errorBadRequest(r http.Response) error {
 
 func NewClientError(r *http.Response) error {
 	if r.StatusCode == http.StatusBadRequest {
-		return errorBadRequest(*r)
+		return ErrorBadRequest(*r)
 	}
 	if r.StatusCode == http.StatusTooManyRequests {
 		return ErrorRateLimitExceeded(*r)
