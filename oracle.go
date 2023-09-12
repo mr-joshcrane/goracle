@@ -1,6 +1,8 @@
 package oracle
 
 import (
+	"context"
+
 	"github.com/mr-joshcrane/oracle/client"
 )
 
@@ -32,7 +34,7 @@ func (p Prompt) GetQuestion() string {
 // LanguageModel is an interface that abstracts a concrete implementation of are
 // language model API call.
 type LanguageModel interface {
-	Completion(prompt client.Prompt) (string, error)
+	Completion(ctx context.Context, prompt client.Prompt) (string, error)
 }
 
 // Oracle is a struct that scaffolds a well formed Oracle, designed in a way
@@ -93,11 +95,11 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(question string) (string, error) {
+func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
 	prompt := o.GeneratePrompt(question)
-	return o.Completion(prompt)
+	return o.Completion(ctx, prompt)
 }
 
-func (o Oracle) Completion(prompt Prompt) (string, error) {
-	return o.client.Completion(prompt)
+func (o Oracle) Completion(ctx context.Context,prompt Prompt) (string, error) {
+	return o.client.Completion(ctx, prompt)
 }

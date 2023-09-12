@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -15,7 +16,7 @@ func main() {
 	}
 	question := "How much wood would a woodchuck chuck?"
 	o := oracle.NewOracle(token)
-	q, err := o.Ask(question)
+	q, err := o.Ask(context.Background(), question)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

@@ -2,12 +2,11 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
-	"os"
 )
 
 const (
@@ -25,7 +24,7 @@ type Dummy struct {
 	FixedHTTPError int
 }
 
-func (d *Dummy) Completion(prompt Prompt) (string, error) {
+func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	if d.FixedHTTPError == 200 {
 		return d.FixedResponse, nil
 	}
@@ -79,21 +78,19 @@ func MessageFromPrompt(prompt Prompt) []Message {
 	return messages
 }
 
-func (c *ChatGPT) Completion(prompt Prompt) (string, error) {
+func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
 	req, err := CreateChatGPTRequest(c.Token, messages)
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", NewClientError(resp)
 	}
-	data, err := httputil.DumpResponse(resp, true)
-	os.WriteFile("response.json", data, 0644)
 	defer resp.Body.Close()
 	return ParseResponse(resp.Body)
 }
