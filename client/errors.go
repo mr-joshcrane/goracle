@@ -34,33 +34,44 @@ func (e BadRequestError) Error() string {
 }
 
 type rateLimit struct {
-	ResetReq          time.Duration
-	ResetTkns         time.Duration
-	TokensRemaining   int
-	RequestsRemaining int
+	RemainingRequests string
+	RemainingTokens   string
+	ResetRequests     time.Duration
+	ResetTokens       time.Duration
 }
 
 func parseRateLimit(resp http.Response) rateLimit {
-	var r rateLimit
-	return r
+	resetRequest := resp.Header.Get("X-Ratelimit-Reset-Requests")
+	parsedResetRequest, err := time.ParseDuration(resetRequest)
+	if err != nil {
+		return rateLimit{}
+	}
+
+	resetTokens := resp.Header.Get("X-Ratelimit-Reset-Tokens")
+	parsedResetTokens, err := time.ParseDuration(resetTokens)
+	if err != nil {
+		return rateLimit{}
+	}
+	return rateLimit{
+		RemainingRequests: resp.Header.Get("X-Ratelimit-Remaining-Requests"),
+		RemainingTokens:   resp.Header.Get("X-Ratelimit-Remaining-Tokens"),
+		ResetRequests:     parsedResetRequest,
+		ResetTokens:       parsedResetTokens,
+	}
 }
 
-func errorRateLimitExceeded(r http.Response) error {
+func ErrorRateLimitExceeded(r http.Response) error {
 	rateLimit := parseRateLimit(r)
-	var retryIn time.Duration
-	if rateLimit.TokensRemaining == 0 {
-		retryIn = rateLimit.ResetTkns
-	} else if rateLimit.RequestsRemaining == 0 {
-		retryIn = rateLimit.ResetReq
+	var err RateLimitError
+	if rateLimit.RemainingTokens == "0" {
+		err.RetryAfter = rateLimit.ResetTokens
+	} else if rateLimit.RemainingRequests == "0" {
+		err.RetryAfter = rateLimit.ResetRequests
 	}
-	rle := RateLimitError{
-		RetryAfter: retryIn,
-	}
-	ce := ClientError{
+	return errors.Join(ClientError{
 		Status:     r.Status,
 		StatusCode: http.StatusTooManyRequests,
-	}
-	return errors.Join(rle, ce)
+	}, err)
 }
 func errorBadRequest(r http.Response) error {
 	brqe := BadRequestError{
@@ -79,7 +90,7 @@ func NewClientError(r *http.Response) error {
 		return errorBadRequest(*r)
 	}
 	if r.StatusCode == http.StatusTooManyRequests {
-		return errorRateLimitExceeded(*r)
+		return ErrorRateLimitExceeded(*r)
 	}
 	return fmt.Errorf("%w", ClientError{
 		Status:     r.Status,

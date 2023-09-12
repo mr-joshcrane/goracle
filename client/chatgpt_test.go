@@ -3,8 +3,10 @@ package client_test
 import (
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
@@ -145,5 +147,78 @@ func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
 	}
 	if want.RetryAfter != 0 {
 		t.Errorf("Expected 0, got %d", want.RetryAfter)
+	}
+}
+
+func TestCompletionWithBadRequestReturnsTokenLength(t *testing.T) {
+	t.Parallel()
+	c := client.NewDummyClient("response", 400)
+	_, err := c.Completion(oracle.Prompt{})
+	want := &client.BadRequestError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.RequestTokens != 0 {
+		t.Errorf("Expected 0, got %d", want.RequestTokens)
+	}
+	if want.TokenLimit != 0 {
+		t.Errorf("Expected 0, got %d", want.TokenLimit)
+	}
+}
+
+func TestErrorRateLimitThatHitsNoLimitSignalsRetryImmediately(t *testing.T) {
+	t.Parallel()
+	req := http.Response{}
+	req.Header = http.Header{
+		"X-Ratelimit-Remaining-Requests": []string{"3500"},
+		"X-Ratelimit-Remaining-Tokens":   []string{"90000"},
+		"X-Ratelimit-Reset-Requests":     []string{"17ms"},
+		"X-Ratelimit-Reset-Tokens":       []string{"28ms"},
+	}
+	err := client.ErrorRateLimitExceeded(req)
+	want := &client.RateLimitError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.RetryAfter != 0 {
+		t.Errorf("Expected 0, got %d", want.RetryAfter)
+	}
+}
+
+func TestErrorRateLimitHitsTokenLimitSignalsRetryAfterTokensReset(t *testing.T) {
+	t.Parallel()
+	req := http.Response{}
+	req.Header = http.Header{
+		"X-Ratelimit-Remaining-Requests": []string{"3500"},
+		"X-Ratelimit-Remaining-Tokens":   []string{"0"},
+		"X-Ratelimit-Reset-Requests":     []string{"17ms"},
+		"X-Ratelimit-Reset-Tokens":       []string{"28ms"},
+	}
+	err := client.ErrorRateLimitExceeded(req)
+	want := &client.RateLimitError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.RetryAfter != time.Duration(28*time.Millisecond) {
+		t.Errorf("Expected 28ms, got %d", want.RetryAfter)
+	}
+}
+
+func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T) {
+	t.Parallel()
+	req := http.Response{}
+	req.Header = http.Header{
+		"X-Ratelimit-Remaining-Requests": []string{"0"},
+		"X-Ratelimit-Remaining-Tokens":   []string{"90000"},
+		"X-Ratelimit-Reset-Requests":     []string{"17ms"},
+		"X-Ratelimit-Reset-Tokens":       []string{"28ms"},
+	}
+	err := client.ErrorRateLimitExceeded(req)
+	want := &client.RateLimitError{}
+	if !errors.As(err, want) {
+		t.Errorf("wanted %v, got %v", want, err)
+	}
+	if want.RetryAfter != time.Duration(17*time.Millisecond) {
+		t.Errorf("Expected 17ms, got %d", want.RetryAfter)
 	}
 }

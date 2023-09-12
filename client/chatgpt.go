@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
+	"os"
 )
 
 const (
@@ -90,6 +92,8 @@ func (c *ChatGPT) Completion(prompt Prompt) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", NewClientError(resp)
 	}
+	data, err := httputil.DumpResponse(resp, true)
+	os.WriteFile("response.json", data, 0644)
 	defer resp.Body.Close()
 	return ParseResponse(resp.Body)
 }
