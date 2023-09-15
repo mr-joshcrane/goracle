@@ -3,6 +3,7 @@
 package oracle_test
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ func TestGiveExample(t *testing.T) {
 		},
 		Question: "6",
 	}
-	answer, err := o.Completion(prompt)
+	answer, err := o.Completion(context.TODO(), prompt)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -40,7 +41,7 @@ func TestAsk(t *testing.T) {
 	o := newTestOracle(t)
 	o.SetPurpose("You always answer questions with the number 42.")
 	question := "What is the meaning of life?"
-	answer, err := o.Ask(question)
+	answer, err := o.Ask(context.TODO(), question)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
