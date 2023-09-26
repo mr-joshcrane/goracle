@@ -100,6 +100,14 @@ func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
 	return o.Completion(ctx, prompt)
 }
 
-func (o Oracle) Completion(ctx context.Context,prompt Prompt) (string, error) {
+func (o Oracle) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	return o.client.Completion(ctx, prompt)
+}
+
+// Reset clears the Oracle's previous chat history
+// Useful for when you hit a context limit
+func (o *Oracle) Reset() {
+	o.purpose = ""
+	o.exampleInputs = []string{}
+	o.idealOutputs = []string{}
 }
