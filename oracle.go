@@ -57,7 +57,7 @@ func WithDummyClient(fixedResponse string, responseCode int) Option {
 	}
 }
 
-func WithGPT3_5Turbo() Option {
+func WithGPT35Turbo() Option {
 	return func(o *Oracle) *Oracle {
 		c, ok := o.client.(*client.ChatGPT)
 		if !ok {
