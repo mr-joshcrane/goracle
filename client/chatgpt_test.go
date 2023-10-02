@@ -16,7 +16,7 @@ import (
 
 func TestGetChatCompletionsRequestHeaders(t *testing.T) {
 	t.Parallel()
-	req, err := client.CreateChatGPTRequest("dummy-token-openai", []client.Message{})
+	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, []client.Message{})
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
@@ -39,7 +39,7 @@ func TestGetChatCompletionsRequestBody(t *testing.T) {
 		},
 	}
 
-	req, err := client.CreateChatGPTRequest("dummy-token-openai", messages)
+	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}

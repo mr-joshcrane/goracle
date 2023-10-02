@@ -15,8 +15,16 @@ const (
 	RoleAssistant = "assistant"
 )
 
+type Model string
+
+const (
+	GPT35Turbo = Model("gpt-3.5-turbo")
+	GPT4       = Model("gpt-4")
+)
+
 type ChatGPT struct {
 	Token string
+	model Model
 }
 
 type Dummy struct {
@@ -35,10 +43,24 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	return "", NewClientError(&response)
 }
 
-func NewChatGPT(token string) *ChatGPT {
-	return &ChatGPT{
-		Token: token,
+type Option func(*ChatGPT) *ChatGPT
+
+func WithGPTModel(m Model) Option {
+	return func(c *ChatGPT) *ChatGPT {
+		c.model = m
+		return c
 	}
+}
+
+func NewChatGPT(token string, opts ...Option) *ChatGPT {
+	c := &ChatGPT{
+		Token: token,
+		model: GPT35Turbo,
+	}
+	for _, opt := range opts {
+		c = opt(c)
+	}
+	return c
 }
 
 func NewDummyClient(fixedResponse string, errorCode int) *Dummy {
@@ -80,7 +102,7 @@ func MessageFromPrompt(prompt Prompt) []Message {
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
-	req, err := CreateChatGPTRequest(c.Token, messages)
+	req, err := CreateChatGPTRequest(c.Token, c.model, messages)
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +123,7 @@ type Message struct {
 }
 
 type ChatCompletionRequest struct {
-	Model    string    `json:"model"`
+	Model    Model     `json:"model"`
 	Messages []Message `json:"messages"`
 }
 
@@ -111,10 +133,10 @@ type ChatCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func CreateChatGPTRequest(token string, messages []Message) (*http.Request, error) {
+func CreateChatGPTRequest(token string, model Model, messages []Message) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
-		Model:    "gpt-3.5-turbo",
+		Model:    model,
 		Messages: messages,
 	})
 	if err != nil {

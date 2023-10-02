@@ -57,6 +57,13 @@ func WithDummyClient(fixedResponse string, responseCode int) Option {
 	}
 }
 
+func WithClient(c LanguageModel) Option {
+	return func(o *Oracle) *Oracle {
+		o.client = c
+		return o
+	}
+}
+
 // NewOracle returns a new Oracle with sensible defaults.
 func NewOracle(token string, opts ...Option) *Oracle {
 	client := client.NewChatGPT(token)
