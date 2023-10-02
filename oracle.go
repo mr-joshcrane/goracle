@@ -2,7 +2,6 @@ package oracle
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/mr-joshcrane/oracle/client"
 )
@@ -62,7 +61,6 @@ func WithGPT3_5Turbo() Option {
 	return func(o *Oracle) *Oracle {
 		c, ok := o.client.(*client.ChatGPT)
 		if !ok {
-			fmt.Println("not ok")
 			return o
 		}
 		c.Model = client.GPT35Turbo
