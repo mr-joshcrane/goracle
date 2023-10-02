@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mr-joshcrane/oracle/client"
 )
@@ -57,8 +58,26 @@ func WithDummyClient(fixedResponse string, responseCode int) Option {
 	}
 }
 
-func WithClient(c LanguageModel) Option {
+func WithGPT3_5Turbo() Option {
 	return func(o *Oracle) *Oracle {
+		c, ok := o.client.(*client.ChatGPT)
+		if !ok {
+			fmt.Println("not ok")
+			return o
+		}
+		c.Model = client.GPT35Turbo
+		o.client = c
+		return o
+	}
+}
+
+func WithGPT4() Option {
+	return func(o *Oracle) *Oracle {
+		c, ok := o.client.(*client.ChatGPT)
+		if !ok {
+			return o
+		}
+		c.Model = client.GPT4
 		o.client = c
 		return o
 	}

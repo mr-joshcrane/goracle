@@ -22,7 +22,7 @@ const (
 
 type ChatGPT struct {
 	Token string
-	model string
+	Model string
 }
 
 type Dummy struct {
@@ -41,24 +41,11 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	return "", NewClientError(&response)
 }
 
-type Option func(*ChatGPT) *ChatGPT
-
-func WithGPTModel(m string) Option {
-	return func(c *ChatGPT) *ChatGPT {
-		c.model = m
-		return c
-	}
-}
-
-func NewChatGPT(token string, opts ...Option) *ChatGPT {
-	c := &ChatGPT{
+func NewChatGPT(token string) *ChatGPT {
+	return &ChatGPT{
 		Token: token,
-		model: GPT35Turbo,
+		Model: GPT35Turbo,
 	}
-	for _, opt := range opts {
-		c = opt(c)
-	}
-	return c
 }
 
 func NewDummyClient(fixedResponse string, errorCode int) *Dummy {
@@ -100,7 +87,7 @@ func MessageFromPrompt(prompt Prompt) []Message {
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
-	req, err := CreateChatGPTRequest(c.Token, c.model, messages)
+	req, err := CreateChatGPTRequest(c.Token, c.Model, messages)
 	if err != nil {
 		return "", err
 	}
