@@ -15,16 +15,14 @@ const (
 	RoleAssistant = "assistant"
 )
 
-type Model string
-
 const (
-	GPT35Turbo = Model("gpt-3.5-turbo")
-	GPT4       = Model("gpt-4")
+	GPT35Turbo = "gpt-3.5-turbo"
+	GPT4       = "gpt-4"
 )
 
 type ChatGPT struct {
 	Token string
-	model Model
+	model string
 }
 
 type Dummy struct {
@@ -45,7 +43,7 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
 
 type Option func(*ChatGPT) *ChatGPT
 
-func WithGPTModel(m Model) Option {
+func WithGPTModel(m string) Option {
 	return func(c *ChatGPT) *ChatGPT {
 		c.model = m
 		return c
@@ -123,7 +121,7 @@ type Message struct {
 }
 
 type ChatCompletionRequest struct {
-	Model    Model     `json:"model"`
+	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
 }
 
@@ -133,7 +131,7 @@ type ChatCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func CreateChatGPTRequest(token string, model Model, messages []Message) (*http.Request, error) {
+func CreateChatGPTRequest(token string, model string, messages []Message) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
 		Model:    model,
