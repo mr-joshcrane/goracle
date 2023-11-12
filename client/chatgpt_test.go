@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -43,7 +44,7 @@ func TestGetChatCompletionsRequestBody(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
-	want := `{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"Say this is a test!"}]}` + "\n"
+	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"Say this is a test!"}]}%s`, client.GPT35Turbo, "\n")
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Errorf("Error reading request body: %s", err)
