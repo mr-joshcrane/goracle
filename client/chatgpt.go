@@ -49,7 +49,7 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
-		Model: GPT35Turbo,
+		Model: GPT4,
 	}
 }
 
