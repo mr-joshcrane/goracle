@@ -64,6 +64,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetExamples() ([]string, []string)
 	GetQuestion() string
+	GetImages() []string
 }
 
 func MessageFromPrompt(prompt Prompt) []Message {
@@ -91,6 +92,47 @@ func MessageFromPrompt(prompt Prompt) []Message {
 }
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
+	if len(prompt.GetImages()) > 0 {
+		return c.visionCompletion(ctx, prompt.GetQuestion(), prompt.GetImages()...)
+	}
+	return c.standardCompletion(ctx, prompt)
+}
+
+func (c *ChatGPT) visionCompletion(ctx context.Context, prompt string, images ...string) (string, error) {
+	for _, image := range images {
+		resp, err := http.DefaultClient.Get(image)
+		if err != nil {
+			return "", ClientError{StatusCode: http.StatusBadRequest, Status: err.Error()}
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", ClientError{StatusCode: resp.StatusCode, Status: resp.Status + " " + image}
+		}
+	}
+	message := CreateVisionMessage(prompt, images...)
+	req, err := CreateVisionRequest(c.Token, message)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", NewClientError(resp)
+	}
+	defer resp.Body.Close()
+	var completion VisionCompletionResponse
+	err = json.NewDecoder(resp.Body).Decode(&completion)
+	if err != nil {
+		return "", err
+	}
+	if len(completion.Choices) < 1 {
+		return "", fmt.Errorf("no choices returned")
+	}
+	return completion.Choices[0].Message.Content, nil
+}
+
+func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (string, error) {
 	messages := MessageFromPrompt(prompt)
 	req, err := CreateChatGPTRequest(c.Token, c.Model, messages)
 	if err != nil {
@@ -193,28 +235,6 @@ func GetModels(token string) ([]string, error) {
 	return results, nil
 }
 
-//from openai import OpenAI
-//client = OpenAI()
-//
-//client.images.generate(
-//  model="dall-e-3",
-//  prompt="A cute baby sea otter",
-//  n=1,
-//  size="1024x1024"
-//)
-
-//{
-//  "created": 1589478378,
-//  "data": [
-//    {
-//      "url": "https://..."
-//    },
-//    {
-//      "url": "https://..."
-//    }
-//  ]
-//}
-
 type ImageRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
@@ -279,4 +299,106 @@ func GenerateImage(token, prompt string) (string, error) {
 	}
 	return image.Data[0].Url, nil
 
+}
+
+func CreateVisionMessage(prompt string, images ...string) VisionMessage {
+	messages := VisionMessage{
+		Role: RoleUser,
+		Content: []map[string]string{
+			{
+				"type": "text",
+				"text": prompt,
+			},
+		},
+	}
+	for _, imageSrc := range images {
+		messages.Content = append(messages.Content, map[string]string{
+			"type":      "image_url",
+			"image_url": imageSrc,
+		})
+	}
+	return messages
+}
+
+type VisionImageURL struct {
+	Type     string `json:"type"`
+	ImageURL struct {
+		URL string `json:"url"`
+	} `json:"image_url"`
+}
+
+type VisionMessage struct {
+	Role    string              `json:"role"`
+	Content []map[string]string `json:"content"`
+}
+
+type VisionRequest struct {
+	Model    string          `json:"model"`
+	Messages []VisionMessage `json:"messages"`
+}
+
+func CreateVisionRequest(token string, message VisionMessage) (*http.Request, error) {
+	buf := new(bytes.Buffer)
+	err := json.NewEncoder(buf).Encode(VisionRequest{
+		Model:    GPT4V,
+		Messages: []VisionMessage{message},
+	})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, "https://api.openai.com/v1/chat/completions", buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	return req, nil
+}
+
+func (c *ChatGPT) VisionCompletion(ctx context.Context, prompt string, images ...string) (string, error) {
+	message := CreateVisionMessage(prompt, images...)
+	req, err := CreateVisionRequest(c.Token, message)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", NewClientError(resp)
+	}
+	defer resp.Body.Close()
+	var completion VisionCompletionResponse
+	err = json.NewDecoder(resp.Body).Decode(&completion)
+	if err != nil {
+		return "", err
+	}
+	if len(completion.Choices) < 1 {
+		return "", fmt.Errorf("no choices returned")
+	}
+	return completion.Choices[0].Message.Content, nil
+}
+
+type VisionCompletionResponse struct {
+	Id      string `json:"id"`
+	Object  string `json:"object"`
+	Created int    `json:"created"`
+	Model   string `json:"model"`
+	Usage   struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
+	Choices []struct {
+		Message struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"message"`
+		FinishDetails struct {
+			Type string `json:"type"`
+		} `json:"finish_details"`
+		Index int `json:"index"`
+	} `json:"choices"`
 }

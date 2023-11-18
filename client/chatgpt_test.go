@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -250,3 +251,58 @@ func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T
 // 		t.Errorf("Expected 42, got %d", want.TotalTokens)
 // 	}
 // }
+
+func TestCreateVisionMessages(t *testing.T) {
+	t.Parallel()
+	msg := client.CreateVisionMessage("somePrompt", "someUrl")
+	want := client.VisionMessage{
+
+		Role: "user",
+		Content: []map[string]string{
+			{
+				"type": "text",
+				"text": "somePrompt",
+			},
+			{
+				"type":      "image_url",
+				"image_url": "someUrl",
+			},
+		},
+	}
+	if !cmp.Equal(want, msg) {
+		t.Error(cmp.Diff(want, msg))
+	}
+}
+
+func TestCreateVisionRequest(t *testing.T) {
+	t.Parallel()
+	msg := client.CreateVisionMessage("somePrompt", "someUrl")
+	req, err := client.CreateVisionRequest("dummy-token-openai", msg)
+	if err != nil {
+		t.Errorf("Error creating request: %s", err)
+	}
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Errorf("Error reading request body: %s", err)
+	}
+	defer req.Body.Close()
+	got := string(data)
+	want := fmt.Sprintf(`
+		{"model":"%s","messages": [
+			{
+				"role":"user",
+				"content": [
+					{"text":"somePrompt", "type":"text"},
+		    	{"image_url":"someUrl", "type":"image_url"}
+				]
+			}
+		]
+}`, client.GPT4V)
+	want = strings.ReplaceAll(want, "\t", "")
+	want = strings.ReplaceAll(want, "\n", "")
+	want = strings.ReplaceAll(want, " ", "")
+	want += "\n"
+	if got != want {
+		t.Error(cmp.Diff(want, got))
+	}
+}

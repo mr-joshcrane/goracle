@@ -13,6 +13,7 @@ type Prompt struct {
 	ExampleInputs []string
 	IdealOutputs  []string
 	Question      string
+	Images        []string
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -31,7 +32,12 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-// LanguageModel is an interface that abstracts a concrete implementation of are
+// GetImages returns the images that the user is asking the Model to compare
+func (p Prompt) GetImages() []string {
+	return p.Images
+}
+
+// LanguageModel is an interface that abstracts a concrete implementation of our
 // language model API call.
 type LanguageModel interface {
 	Completion(ctx context.Context, prompt client.Prompt) (string, error)
@@ -96,12 +102,13 @@ func NewOracle(token string, opts ...Option) *Oracle {
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string) Prompt {
+func (o *Oracle) GeneratePrompt(question string, images ...string) Prompt {
 	return Prompt{
 		Purpose:       o.purpose,
 		ExampleInputs: o.exampleInputs,
 		IdealOutputs:  o.idealOutputs,
 		Question:      question,
+		Images:        images,
 	}
 }
 
@@ -121,6 +128,12 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 // Large Language Model.
 func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
 	prompt := o.GeneratePrompt(question)
+	return o.Completion(ctx, prompt)
+}
+
+func (o Oracle) AskWithVision(ctx context.Context, question string, images ...string) (string, error) {
+	prompt := o.GeneratePrompt(question, images...)
+
 	return o.Completion(ctx, prompt)
 }
 
