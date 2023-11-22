@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -254,7 +256,8 @@ func TestCreateVisionRequest(t *testing.T) {
 		    	{"image_url":"someUrl", "type":"image_url"}
 				]
 			}
-		]
+		],
+		"max_tokens": 300
 }`, client.GPT4V)
 	want = strings.ReplaceAll(want, "\t", "")
 	want = strings.ReplaceAll(want, "\n", "")
@@ -265,17 +268,37 @@ func TestCreateVisionRequest(t *testing.T) {
 	}
 }
 
-func TestIsBase64String(t *testing.T) {
+func TestImageToDataURI(t *testing.T) {
 	t.Parallel()
-	if !client.IsBase64("YQ==") {
-		t.Errorf("Expected true, got false")
+	testImage := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	got, err := client.ImageToDataURI(testImage)
+	if err != nil {
+		t.Errorf("Error converting image to data uri: %s", err)
 	}
-	if client.IsBase64("dGVzdA") {
-		t.Errorf("Expected false, got true")
+	want := "data:image/png;base64,"
+	if !strings.HasPrefix(got, want) {
+		t.Fatal(cmp.Diff(want, got))
 	}
 }
 
-func TestIsJPG(t *testing.T) {
+func TestURLToURI(t *testing.T) {
 	t.Parallel()
+	pngURL, _ := url.Parse("https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png")
+	got, err := client.URLToURI(*pngURL)
+	if err != nil {
+		t.Errorf("Error converting url to data uri: %s", err)
+	}
+	want := "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png"
+	if want != got {
+		t.Fatalf("Expected %s, got %s", want, got)
+	}
+}
 
+func TestURLToURI_IfNotValidType(t *testing.T) {
+	t.Parallel()
+	nonPNGURL, _ := url.Parse("https://www.google.com")
+	_, err := client.URLToURI(*nonPNGURL)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
 }

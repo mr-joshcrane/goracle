@@ -61,8 +61,8 @@ func TestAskWithVision(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	if !strings.Contains(answer, "red") {
-		t.Errorf("Expected red, got %s", answer)
+	if !strings.Contains(answer, "black") {
+		t.Errorf("Expected black, got %s", answer)
 	}
 }
 

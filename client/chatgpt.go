@@ -248,35 +248,6 @@ type ModelResponse struct {
 	} `json:"data"`
 }
 
-func GetModels(token string) ([]string, error) {
-	var models ModelResponse
-	req, err := http.NewRequest(http.MethodGet, "https://api.openai.com/v1/engines", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, NewClientError(resp)
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(data, &models)
-
-	var results []string
-	for _, model := range models.Data {
-		results = append(results, model.Id)
-	}
-	return results, nil
-}
-
 type ImageRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
@@ -444,30 +415,4 @@ type VisionCompletionResponse struct {
 		} `json:"finish_details"`
 		Index int `json:"index"`
 	} `json:"choices"`
-}
-
-func IsBase64(s string) bool {
-	_, err := base64.StdEncoding.DecodeString(s)
-	return err == nil
-}
-
-func imageType(s string) (string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return "", err
-	}
-	_, format, err := image.DecodeConfig(bytes.NewReader(decoded))
-	if err != nil {
-		return "", err
-	}
-	if format == "jpeg" {
-		return "data:image/jpeg;base64," + s, nil
-	}
-	if format == "jpg" {
-		return "data:image/jpeg;base64," + s, nil
-	}
-	if format == "png" {
-		return "data:image/png;base64," + s, nil
-	}
-	return "", fmt.Errorf("unknown image format: %s", format)
 }
