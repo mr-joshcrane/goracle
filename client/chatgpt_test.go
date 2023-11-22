@@ -153,22 +153,6 @@ func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
 	}
 }
 
-// func TestCompletionWithBadRequestReturnsTokenLength(t *testing.T) {
-// 	t.Parallel()
-// 	c := client.NewDummyClient("response", 400)
-// 	_, err := c.Completion(context.Background(), oracle.Prompt{})
-// 	want := &client.BadRequestError{}
-// 	if !errors.As(err, want) {
-// 		t.Errorf("wanted %v, got %v", want, err)
-// 	}
-// 	if want.PromptTokens != 0 {
-// 		t.Errorf("Expected 0, got %d", want.PromptTokens)
-// 	}
-// 	if want.TokenLimit != 0 {
-// 		t.Errorf("Expected 0, got %d", want.TokenLimit)
-// 	}
-// }
-
 func TestErrorRateLimitThatHitsNoLimitSignalsRetryImmediately(t *testing.T) {
 	t.Parallel()
 	req := http.Response{}
@@ -226,32 +210,6 @@ func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T
 	}
 }
 
-// func TestParseResponseForUsageMetrics(t *testing.T) {
-// 	t.Parallel()
-// 	f, fErr := os.Open("testdata/response.json")
-// 	if fErr != nil {
-// 		t.Fatal(fErr)
-// 	}
-// 	defer f.Close()
-// 	data, fErr := io.ReadAll(f)
-// 	if fErr != nil {
-// 		t.Fatal(fErr)
-// 	}
-// 	var resp http.Response
-// 	resp.Body = io.NopCloser(bytes.NewReader(data))
-// 	err := client.ErrorBadRequest(resp)
-// 	want := &client.BadRequestError{}
-// 	if !errors.As(err, want) {
-// 		t.Errorf("wanted %v, got %v", want, err)
-// 	}
-// 	if want.PromptTokens != 17 {
-// 		t.Errorf("Expected 17, got %d", want.PromptTokens)
-// 	}
-// 	if want.TotalTokens != 42 {
-// 		t.Errorf("Expected 42, got %d", want.TotalTokens)
-// 	}
-// }
-
 func TestCreateVisionMessages(t *testing.T) {
 	t.Parallel()
 	msg := client.CreateVisionMessage("somePrompt", "someUrl")
@@ -305,4 +263,19 @@ func TestCreateVisionRequest(t *testing.T) {
 	if got != want {
 		t.Error(cmp.Diff(want, got))
 	}
+}
+
+func TestIsBase64String(t *testing.T) {
+	t.Parallel()
+	if !client.IsBase64("YQ==") {
+		t.Errorf("Expected true, got false")
+	}
+	if client.IsBase64("dGVzdA") {
+		t.Errorf("Expected false, got true")
+	}
+}
+
+func TestIsJPG(t *testing.T) {
+	t.Parallel()
+
 }

@@ -4,6 +4,7 @@ package oracle_test
 
 import (
 	"context"
+	"image"
 	"os"
 	"strings"
 	"testing"
@@ -47,6 +48,21 @@ func TestAsk(t *testing.T) {
 	}
 	if !strings.Contains(answer, "42") {
 		t.Errorf("Expected 42, got %s", answer)
+	}
+}
+
+func TestAskWithVision(t *testing.T) {
+	t.Parallel()
+	o := newTestOracle(t)
+	o.SetPurpose("You tell me what the color in this image is")
+	question := "What color is this?"
+	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	answer, err := o.AskWithVision(context.TODO(), question, oracle.NewImage(testImage))
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	if !strings.Contains(answer, "red") {
+		t.Errorf("Expected red, got %s", answer)
 	}
 }
 

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/mr-joshcrane/oracle"
@@ -14,11 +16,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, "OPENAI_API_KEY is not set")
 		os.Exit(1)
 	}
-	question := "How much wood would a woodchuck chuck?"
 	o := oracle.NewOracle(token)
-	q, err := o.Ask(context.Background(), question)
+	f, err := os.Open("picture.jpg")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	fmt.Fprintln(os.Stdout, q)
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	enc := base64.StdEncoding.EncodeToString(data)
+	answer, err := o.AskWithVision(context.TODO(), "What is this picture?", enc)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(answer)
 }

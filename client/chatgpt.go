@@ -3,10 +3,14 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 const (
@@ -64,7 +68,8 @@ type Prompt interface {
 	GetPurpose() string
 	GetExamples() ([]string, []string)
 	GetQuestion() string
-	GetImages() []string
+	GetImages() []image.Image
+	GetUrls() []url.URL
 }
 
 func MessageFromPrompt(prompt Prompt) []Message {
@@ -91,23 +96,60 @@ func MessageFromPrompt(prompt Prompt) []Message {
 	return messages
 }
 
+func ImageToDataURI(img image.Image) (string, error) {
+	var buf bytes.Buffer
+	err := png.Encode(&buf, img)
+	if err != nil {
+		return "", err
+	}
+	base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
+	dataURI := "data:image/png;base64," + base64Str
+	return dataURI, nil
+}
+
+func URLToURI(url url.URL) (string, error) {
+	visionMimeType := []string{
+		"image/png",
+		"image/jpeg",
+		"image/jpg",
+	}
+	resp, err := http.DefaultClient.Head(url.String())
+	if err != nil {
+		return "", err
+	}
+	for _, mimeType := range visionMimeType {
+		if resp.Header.Get("Content-Type") == mimeType {
+			return url.String(), nil
+		}
+	}
+	return "", fmt.Errorf("unsupported visual mime type: %s", resp.Header.Get("Content-Type"))
+}
+
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
-	if len(prompt.GetImages()) > 0 {
-		return c.visionCompletion(ctx, prompt.GetQuestion(), prompt.GetImages()...)
+	var images []string
+
+	for _, image := range prompt.GetImages() {
+		dataURI, err := ImageToDataURI(image)
+		if err != nil {
+			return "", err
+		}
+		images = append(images, dataURI)
+	}
+
+	for _, url := range prompt.GetUrls() {
+		dataURI, err := URLToURI(url)
+		if err != nil {
+			continue
+		}
+		images = append(images, dataURI)
+	}
+	if len(images) > 0 {
+		return c.visionCompletion(ctx, prompt.GetQuestion(), images...)
 	}
 	return c.standardCompletion(ctx, prompt)
 }
 
 func (c *ChatGPT) visionCompletion(ctx context.Context, prompt string, images ...string) (string, error) {
-	for _, image := range images {
-		resp, err := http.DefaultClient.Get(image)
-		if err != nil {
-			return "", ClientError{StatusCode: http.StatusBadRequest, Status: err.Error()}
-		}
-		if resp.StatusCode != http.StatusOK {
-			return "", ClientError{StatusCode: resp.StatusCode, Status: resp.Status + " " + image}
-		}
-	}
 	message := CreateVisionMessage(prompt, images...)
 	req, err := CreateVisionRequest(c.Token, message)
 	if err != nil {
@@ -288,7 +330,6 @@ func GenerateImage(token, prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(string(data))
 	var image ImageResponse
 	err = json.Unmarshal(data, &image)
 	if err != nil {
@@ -333,15 +374,17 @@ type VisionMessage struct {
 }
 
 type VisionRequest struct {
-	Model    string          `json:"model"`
-	Messages []VisionMessage `json:"messages"`
+	Model     string          `json:"model"`
+	Messages  []VisionMessage `json:"messages"`
+	MaxTokens int             `json:"max_tokens"`
 }
 
 func CreateVisionRequest(token string, message VisionMessage) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(VisionRequest{
-		Model:    GPT4V,
-		Messages: []VisionMessage{message},
+		Model:     GPT4V,
+		Messages:  []VisionMessage{message},
+		MaxTokens: 300,
 	})
 	if err != nil {
 		return nil, err
@@ -401,4 +444,30 @@ type VisionCompletionResponse struct {
 		} `json:"finish_details"`
 		Index int `json:"index"`
 	} `json:"choices"`
+}
+
+func IsBase64(s string) bool {
+	_, err := base64.StdEncoding.DecodeString(s)
+	return err == nil
+}
+
+func imageType(s string) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return "", err
+	}
+	_, format, err := image.DecodeConfig(bytes.NewReader(decoded))
+	if err != nil {
+		return "", err
+	}
+	if format == "jpeg" {
+		return "data:image/jpeg;base64," + s, nil
+	}
+	if format == "jpg" {
+		return "data:image/jpeg;base64," + s, nil
+	}
+	if format == "png" {
+		return "data:image/png;base64," + s, nil
+	}
+	return "", fmt.Errorf("unknown image format: %s", format)
 }

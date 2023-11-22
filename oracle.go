@@ -2,6 +2,8 @@ package oracle
 
 import (
 	"context"
+	"image"
+	"net/url"
 
 	"github.com/mr-joshcrane/oracle/client"
 )
@@ -13,7 +15,8 @@ type Prompt struct {
 	ExampleInputs []string
 	IdealOutputs  []string
 	Question      string
-	Images        []string
+	Images        []image.Image
+	Urls          []url.URL
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -33,8 +36,12 @@ func (p Prompt) GetQuestion() string {
 }
 
 // GetImages returns the images that the user is asking the Model to compare
-func (p Prompt) GetImages() []string {
+func (p Prompt) GetImages() []image.Image {
 	return p.Images
+}
+
+func (p Prompt) GetUrls() []url.URL {
+	return p.Urls
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -63,30 +70,6 @@ func WithDummyClient(fixedResponse string, responseCode int) Option {
 	}
 }
 
-func WithGPT35Turbo() Option {
-	return func(o *Oracle) *Oracle {
-		c, ok := o.client.(*client.ChatGPT)
-		if !ok {
-			return o
-		}
-		c.Model = client.GPT35Turbo
-		o.client = c
-		return o
-	}
-}
-
-func WithGPT4() Option {
-	return func(o *Oracle) *Oracle {
-		c, ok := o.client.(*client.ChatGPT)
-		if !ok {
-			return o
-		}
-		c.Model = client.GPT4
-		o.client = c
-		return o
-	}
-}
-
 // NewOracle returns a new Oracle with sensible defaults.
 func NewOracle(token string, opts ...Option) *Oracle {
 	client := client.NewChatGPT(token)
@@ -100,15 +83,45 @@ func NewOracle(token string, opts ...Option) *Oracle {
 	return o
 }
 
+type ImageOrURL struct {
+	Type  string
+	Value any
+}
+
+func NewImage(image image.Image) ImageOrURL {
+	return ImageOrURL{
+		Type:  "image",
+		Value: image,
+	}
+}
+
+func NewURL(url url.URL) ImageOrURL {
+	return ImageOrURL{
+		Type:  "url",
+		Value: url,
+	}
+}
+
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, images ...string) Prompt {
+func (o *Oracle) GeneratePrompt(question string, items ...ImageOrURL) Prompt {
+	images := []image.Image{}
+	urls := []url.URL{}
+	for _, v := range items {
+		switch v.Type {
+		case "image":
+			images = append(images, v.Value.(image.Image))
+		case "url":
+			urls = append(urls, v.Value.(url.URL))
+		}
+	}
 	return Prompt{
 		Purpose:       o.purpose,
 		ExampleInputs: o.exampleInputs,
 		IdealOutputs:  o.idealOutputs,
 		Question:      question,
 		Images:        images,
+		Urls:          urls,
 	}
 }
 
@@ -131,9 +144,8 @@ func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
 	return o.Completion(ctx, prompt)
 }
 
-func (o Oracle) AskWithVision(ctx context.Context, question string, images ...string) (string, error) {
-	prompt := o.GeneratePrompt(question, images...)
-
+func (o Oracle) AskWithVision(ctx context.Context, question string, imageOrURL ...ImageOrURL) (string, error) {
+	prompt := o.GeneratePrompt(question, imageOrURL...)
 	return o.Completion(ctx, prompt)
 }
 
