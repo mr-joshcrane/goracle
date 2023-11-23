@@ -41,8 +41,8 @@ func TestGetVisualCompletion_URIs(t *testing.T) {
 	u2, _ := url.Parse("https://upload.wikimedia.org/wikipedia/commons/6/60/Microsoft_logo_%281975%29.svg")
 
 	prompt := oracle.Prompt{
-		Purpose:  "You guess the famous brand",
-		Question: "What is associated with the following Logos?",
+		Purpose:  "You guess the famous companies",
+		Question: "Guess the comapny?",
 		Urls:     []url.URL{*u1, *u2},
 	}
 	answer, err := c.Completion(context.TODO(), prompt)
@@ -52,5 +52,24 @@ func TestGetVisualCompletion_URIs(t *testing.T) {
 	if !strings.Contains(answer, "Microsoft") {
 
 		t.Errorf("Expected Microsoft, got %s", answer)
+	}
+}
+
+func TestTextToSpeechToText(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("OPENAI_API_KEY")
+	data, err := client.GenerateSpeech(token, "Hello world")
+	if err != nil {
+		t.Errorf("Error generating speech: %s", err)
+	}
+	if len(data) == 0 {
+		t.Errorf("Expected data, got empty string")
+	}
+	text, err := client.SpeechToText(token, data)
+	if err != nil {
+		t.Errorf("Error converting speech to text: %s", err)
+	}
+	if !strings.Contains(text, "Hello") && !strings.Contains(text, "world") {
+		t.Errorf("Expected Hello world, got %s", text)
 	}
 }

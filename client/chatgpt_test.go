@@ -1,12 +1,14 @@
 package client_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -300,5 +302,60 @@ func TestURLToURI_IfNotValidType(t *testing.T) {
 	_, err := client.URLToURI(*nonPNGURL)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
+	}
+}
+
+func TestTextToSpeechRequest(t *testing.T) {
+	t.Parallel()
+	got, err := client.CreateTextToSpeechRequest("testToken", "someText")
+	if err != nil {
+		t.Errorf("Error creating response: %s", err)
+	}
+	buf := bytes.NewReader([]byte(`{"model":"tts-1","input":"someText","voice":"alloy"}`))
+	want := httptest.NewRequest("POST", "https://api.openai.com/v1/audio/speech", buf)
+	if got.Method != want.Method {
+		t.Errorf("Expected %s, got %s", want.Method, got.Method)
+	}
+	if got.URL.Host != want.URL.Host {
+		t.Errorf("Expected %s, got %s", want.URL.Host, got.URL.Host)
+	}
+	if got.URL.Path != want.URL.Path {
+		t.Errorf("Expected %s, got %s", want.URL.Path, got.URL.Path)
+	}
+	wantBody := []byte{}
+	gotBody := []byte{}
+	_, _ = want.Body.Read(wantBody)
+	_, _ = got.Body.Read(gotBody)
+
+	if !cmp.Equal(wantBody, gotBody) {
+		t.Error(cmp.Diff(wantBody, gotBody))
+	}
+}
+
+func TestSpeechToTextRequest(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/test.wav"
+	err := os.WriteFile(path, []byte("test"), 0644)
+	if err != nil {
+		t.Errorf("Error creating test file: %s", err)
+	}
+	got, err := client.CreateSpeechToTextRequest("", []byte{})
+	if err != nil {
+		t.Errorf("Error creating response: %s", err)
+	}
+	contentType := "multipart/form-data; boundary="
+	if !strings.Contains(got.Header.Get("Content-Type"), contentType) {
+		t.Errorf("Expected content type to contain %v, got %s", contentType, got.Header.Get("Content-Type"))
+	}
+	if got.URL.Host != "api.openai.com" {
+		t.Errorf("Expected api.openai.com, got %s", got.URL.Host)
+	}
+	if got.URL.Path != "/v1/audio/transcriptions" {
+		t.Errorf("Expected /v1/audio/speech, got %s", got.URL.Path)
+	}
+	body := new(bytes.Buffer)
+	body.ReadFrom(got.Body)
+	if body.Len() == 0 {
+		t.Errorf("Expected non-empty body, got empty body")
 	}
 }
