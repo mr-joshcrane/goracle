@@ -3,6 +3,7 @@ package oracle
 import (
 	"context"
 	"image"
+	"io"
 	"net/url"
 
 	"github.com/mr-joshcrane/oracle/client"
@@ -17,6 +18,8 @@ type Prompt struct {
 	Question      string
 	Images        []image.Image
 	Urls          []url.URL
+	Target        io.Writer
+	Source        io.Reader
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -42,6 +45,14 @@ func (p Prompt) GetImages() []image.Image {
 
 func (p Prompt) GetUrls() []url.URL {
 	return p.Urls
+}
+
+func (p Prompt) GetTarget() io.Writer {
+	return p.Target
+}
+
+func (p Prompt) GetSource() io.Reader {
+	return p.Source
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -83,45 +94,99 @@ func NewOracle(token string, opts ...Option) *Oracle {
 	return o
 }
 
-type ImageOrURL struct {
+type Asset struct {
 	Type  string
 	Value any
 }
 
-func NewImage(image image.Image) ImageOrURL {
-	return ImageOrURL{
-		Type:  "image",
-		Value: image,
+func WithImages(images ...image.Image) []Asset {
+	assets := []Asset{}
+	for _, image := range images {
+		assets = append(assets, Asset{
+			Type:  "image",
+			Value: image,
+		})
+	}
+	return assets
+}
+
+func WithURLs(urls ...url.URL) []Asset {
+	assets := []Asset{}
+	for _, u := range urls {
+		assets = append(assets, Asset{
+			Type:  "url",
+			Value: u,
+		})
+	}
+	return assets
+}
+
+func WithTarget(target io.Writer) []Asset {
+	return []Asset{
+		{
+			Type:  "target",
+			Value: target,
+		},
 	}
 }
 
-func NewURL(url url.URL) ImageOrURL {
-	return ImageOrURL{
-		Type:  "url",
-		Value: url,
+func WithSource(source io.Reader) []Asset {
+	return []Asset{
+		{
+			Type:  "source",
+			Value: source,
+		},
 	}
 }
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, items ...ImageOrURL) Prompt {
-	images := []image.Image{}
-	urls := []url.URL{}
-	for _, v := range items {
-		switch v.Type {
-		case "image":
-			images = append(images, v.Value.(image.Image))
-		case "url":
-			urls = append(urls, v.Value.(url.URL))
-		}
-	}
+func (o *Oracle) GeneratePrompt(question string) Prompt {
 	return Prompt{
 		Purpose:       o.purpose,
 		ExampleInputs: o.exampleInputs,
 		IdealOutputs:  o.idealOutputs,
 		Question:      question,
-		Images:        images,
-		Urls:          urls,
+	}
+}
+
+func DescribeImagePrompt(question string, items ...[]Asset) Prompt {
+	images := []image.Image{}
+	urls := []url.URL{}
+	for _, item := range items {
+		for _, asset := range item {
+			switch asset.Type {
+			case "image":
+				images = append(images, asset.Value.(image.Image))
+			case "url":
+				urls = append(urls, asset.Value.(url.URL))
+			}
+		}
+	}
+	return Prompt{
+		Question: question,
+		Images:   images,
+		Urls:     urls,
+	}
+}
+
+func CreateTranscriptPrompt(source io.Reader) Prompt {
+	return Prompt{
+		Source: source,
+	}
+}
+
+func CreateAudioPrompt(source io.Reader, target io.Writer) Prompt {
+	return Prompt{
+		Source: source,
+		Target: target,
+	}
+}
+
+func CreateImagePrompt(question string, target io.Writer) Prompt {
+	return Prompt{
+		Question: question,
+		Target:   target,
 	}
 }
 
@@ -144,11 +209,29 @@ func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
 	return o.Completion(ctx, prompt)
 }
 
-func (o Oracle) AskWithVision(ctx context.Context, question string, imageOrURL ...ImageOrURL) (string, error) {
-	prompt := o.GeneratePrompt(question, imageOrURL...)
+func (o Oracle) DescribeImage(ctx context.Context, question string, asset ...Asset) (string, error) {
+	prompt := DescribeImagePrompt(question, asset)
 	return o.Completion(ctx, prompt)
 }
 
+func (o Oracle) CreateImage(ctx context.Context, question string, target io.Writer) error {
+	prompt := CreateImagePrompt(question, target)
+	_, err := o.Completion(ctx, prompt)
+	return err
+}
+
+func (o Oracle) CreateTranscript(ctx context.Context, source io.Reader) (string, error) {
+	prompt := CreateTranscriptPrompt(source)
+	return o.Completion(ctx, prompt)
+}
+
+func (o Oracle) CreateAudio(ctx context.Context, question string, target io.Writer) error {
+	prompt := o.GeneratePrompt(question)
+	_, err := o.Completion(ctx, prompt)
+	return err
+}
+
+// Completion is a wrapper around the underlying Large Language Model API call.
 func (o Oracle) Completion(ctx context.Context, prompt Prompt) (string, error) {
 	return o.client.Completion(ctx, prompt)
 }

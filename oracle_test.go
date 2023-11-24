@@ -27,8 +27,6 @@ func TestGeneratePrompt_GeneratesExpectedPrompt(t *testing.T) {
 			"---odd---",
 		},
 		Question: "4",
-		Images:   []image.Image{},
-		Urls:     []url.URL{},
 	}
 	if !cmp.Equal(want, got) {
 		t.Error(cmp.Diff(want, got))
@@ -37,12 +35,10 @@ func TestGeneratePrompt_GeneratesExpectedPrompt(t *testing.T) {
 
 func TestWithVision_ImageModality(t *testing.T) {
 	t.Parallel()
-	o := oracle.NewOracle("dummy-token-openai")
-	o.SetPurpose("To detect if there is a human in the image")
 	testImage := image.NewGray(image.Rect(0, 0, 1, 1))
-	got := o.GeneratePrompt("Is there a human in this image?", oracle.NewImage(testImage))
+	images := oracle.WithImages(testImage)
+	got := oracle.DescribeImagePrompt("Is there a human in this image?", images)
 	want := oracle.Prompt{
-		Purpose:  "To detect if there is a human in the image",
 		Question: "Is there a human in this image?",
 		Images:   []image.Image{testImage},
 		Urls:     []url.URL{},
@@ -54,12 +50,10 @@ func TestWithVision_ImageModality(t *testing.T) {
 
 func TestWithVision_UrlModality(t *testing.T) {
 	t.Parallel()
-	o := oracle.NewOracle("dummy-token-openai")
-	o.SetPurpose("To detect if there is a human in the image")
 	testUrl, _ := url.Parse("https://www.google.com")
-	got := o.GeneratePrompt("Is there a human in this image?", oracle.NewURL(*testUrl))
+	urls := oracle.WithURLs(*testUrl)
+	got := oracle.DescribeImagePrompt("Is there a human in this image?", urls)
 	want := oracle.Prompt{
-		Purpose:  "To detect if there is a human in the image",
 		Question: "Is there a human in this image?",
 		Images:   []image.Image{},
 		Urls:     []url.URL{*testUrl},
@@ -71,13 +65,12 @@ func TestWithVision_UrlModality(t *testing.T) {
 
 func TestWithVision_MixedModality(t *testing.T) {
 	t.Parallel()
-	o := oracle.NewOracle("dummy-token-openai")
-	o.SetPurpose("To detect if there is a human in the image")
 	testImage := image.NewGray(image.Rect(0, 0, 1, 1))
 	testUrl, _ := url.Parse("https://www.google.com")
-	got := o.GeneratePrompt("Is there a human in this image?", oracle.NewImage(testImage), oracle.NewURL(*testUrl))
+	images := oracle.WithImages(testImage)
+	urls := oracle.WithURLs(*testUrl)
+	got := oracle.DescribeImagePrompt("Is there a human in this image?", images, urls)
 	want := oracle.Prompt{
-		Purpose:  "To detect if there is a human in the image",
 		Question: "Is there a human in this image?",
 		Images:   []image.Image{testImage},
 		Urls:     []url.URL{*testUrl},
@@ -98,8 +91,6 @@ func TestReset(t *testing.T) {
 		ExampleInputs: []string{"I can remember"},
 		IdealOutputs:  []string{"I can remember"},
 		Question:      "What did I have to say?",
-		Images:        []image.Image{},
-		Urls:          []url.URL{},
 	}
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
@@ -111,8 +102,6 @@ func TestReset(t *testing.T) {
 		ExampleInputs: []string{},
 		IdealOutputs:  []string{},
 		Question:      "What about after the reset?",
-		Images:        []image.Image{},
-		Urls:          []url.URL{},
 	}
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))

@@ -51,13 +51,14 @@ func TestAsk(t *testing.T) {
 	}
 }
 
-func TestAskWithVision(t *testing.T) {
+func TestDescribeImage(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
 	o.SetPurpose("You tell me what the color in this image is")
 	question := "What color is this?"
 	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	answer, err := o.AskWithVision(context.TODO(), question, oracle.NewImage(testImage))
+	images := oracle.WithImages(testImage)
+	answer, err := o.DescribeImage(context.TODO(), question, images...)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
