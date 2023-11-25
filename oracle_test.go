@@ -1,171 +1,119 @@
 package oracle_test
 
 import (
-	"image"
-	"net/url"
+	"bytes"
+	"context"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
+	"github.com/mr-joshcrane/oracle/client"
 )
 
-func TestGeneratePrompt_GeneratesExpectedPrompt(t *testing.T) {
+func ctx() context.Context {
+	return context.TODO()
+}
+
+func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.Dummy) {
+	c := client.NewDummyClient(fixedResponse, err)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	o.SetPurpose("You are a test Oracle")
+	return o, c
+}
+
+func TestTextToSpeech(t *testing.T) {
 	t.Parallel()
-	o := oracle.NewOracle("dummy-token-openai")
-	o.SetPurpose("To answer if a number is odd or even in a specific format")
-	o.GiveExample("2", "+++even+++")
-	o.GiveExample("3", "---odd---")
-	got := o.GeneratePrompt("4")
-	want := oracle.Prompt{
-		Purpose: "To answer if a number is odd or even in a specific format",
-		ExampleInputs: []string{
-			"2",
-			"3",
-		},
-		IdealOutputs: []string{
-			"+++even+++",
-			"---odd---",
-		},
-		Question: "4",
+	o, _ := createTestOracle("Hello World", nil)
+	r, err := o.TextToSpeech(ctx(), "Hello World")
+	if err != nil {
+		t.Errorf("Error generating speech from text: %s", err)
 	}
-	if !cmp.Equal(want, got) {
-		t.Error(cmp.Diff(want, got))
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Errorf("Error reading speech: %s", err)
+	}
+	got := string(data)
+	if got != "Hello World" {
+		t.Errorf("Expected Hello World, got %s", string(data))
 	}
 }
 
-func TestWithVision_ImageModality(t *testing.T) {
+func TestSpeechToText(t *testing.T) {
 	t.Parallel()
-	testImage := image.NewGray(image.Rect(0, 0, 1, 1))
-	images := oracle.WithImages(testImage)
-	got := oracle.DescribeImagePrompt("Is there a human in this image?", images)
-	want := oracle.Prompt{
-		Question: "Is there a human in this image?",
-		Images:   []image.Image{testImage},
-		Urls:     []url.URL{},
+	o, _ := createTestOracle("", nil)
+	reader := bytes.NewReader([]byte("Hello World"))
+	got, err := o.SpeechToText(ctx(), reader)
+	if err != nil {
+		t.Errorf("Error generating speech from text: %s", err)
 	}
-	if !cmp.Equal(want, got) {
-		t.Error(cmp.Diff(want, got))
+	if got != "Hello World" {
+		t.Errorf("Expected Hello World, got %s", got)
 	}
 }
 
-func TestWithVision_UrlModality(t *testing.T) {
+func TestAsk(t *testing.T) {
 	t.Parallel()
-	testUrl, _ := url.Parse("https://www.google.com")
-	urls := oracle.WithURLs(*testUrl)
-	got := oracle.DescribeImagePrompt("Is there a human in this image?", urls)
+	o, c := createTestOracle("Hello World", nil)
+	got, err := o.Ask(ctx(), "Hello World")
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	if got != "Hello World" {
+		t.Errorf("Expected Hello World, got %s", got)
+	}
 	want := oracle.Prompt{
-		Question: "Is there a human in this image?",
-		Images:   []image.Image{},
-		Urls:     []url.URL{*testUrl},
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
 	}
-	if !cmp.Equal(want, got) {
-		t.Error(cmp.Diff(want, got))
-	}
-}
-
-func TestWithVision_MixedModality(t *testing.T) {
-	t.Parallel()
-	testImage := image.NewGray(image.Rect(0, 0, 1, 1))
-	testUrl, _ := url.Parse("https://www.google.com")
-	images := oracle.WithImages(testImage)
-	urls := oracle.WithURLs(*testUrl)
-	got := oracle.DescribeImagePrompt("Is there a human in this image?", images, urls)
-	want := oracle.Prompt{
-		Question: "Is there a human in this image?",
-		Images:   []image.Image{testImage},
-		Urls:     []url.URL{*testUrl},
-	}
-	if !cmp.Equal(want, got) {
-		t.Error(cmp.Diff(want, got))
+	if !cmp.Equal(c.P, want) {
+		t.Fatal(cmp.Diff(want, c.P))
 	}
 }
 
 func TestReset(t *testing.T) {
 	t.Parallel()
-	o := oracle.NewOracle("dummy-token-openai")
-	o.SetPurpose("Can you remember what I had to say?")
-	o.GiveExample("I can remember", "I can remember")
-	got := o.GeneratePrompt("What did I have to say?")
-	want := oracle.Prompt{
-		Purpose:       "Can you remember what I had to say?",
-		ExampleInputs: []string{"I can remember"},
-		IdealOutputs:  []string{"I can remember"},
-		Question:      "What did I have to say?",
-	}
-	if !cmp.Equal(want, got) {
-		t.Fatal(cmp.Diff(want, got))
+	o, c := createTestOracle("Hello World", nil)
+	o.GiveExample("An example that should be forgotten", "And the ideal response that should be forgotten")
+	o.SetPurpose("Setting a purpose that should be forgotten")
+	_, err := o.Ask(ctx(), "A question that should be forgotten")
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
 	}
 	o.Reset()
-	got = o.GeneratePrompt("What about after the reset?")
-	want = oracle.Prompt{
-		Purpose:       "",
-		ExampleInputs: []string{},
-		IdealOutputs:  []string{},
-		Question:      "What about after the reset?",
+	_, err = o.Ask(ctx(), "Hello World")
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
 	}
-	if !cmp.Equal(want, got) {
-		t.Fatal(cmp.Diff(want, got))
+	want := oracle.Prompt{
+		InputHistory:  []string{},
+		OutputHistory: []string{},
+		Question:      "Hello World",
+	}
+	if !cmp.Equal(c.P, want) {
+		t.Fatal(cmp.Diff(want, c.P))
 	}
 }
 
-func TestAccessorMethodsOnPrompt(t *testing.T) {
+func TestPromptAccessorMethods(t *testing.T) {
 	t.Parallel()
-	p := oracle.Prompt{
-		Purpose:       "Respond with lame witicisms",
-		ExampleInputs: []string{"How do you eat an elephant?", "What is the essence of humour?"},
-		IdealOutputs:  []string{"One bite at a time", "Timing"},
-		Question:      "Where do you find an elephant?",
-		Images: []image.Image{
-			image.NewGray(image.Rect(0, 0, 1, 1)),
-		},
-		Urls: []url.URL{
-			*(&url.URL{
-				Scheme: "https",
-				Host:   "www.google.com",
-			}),
-		},
+	prompt := oracle.Prompt{
+		Purpose:       "You are a test Oracle",
+		Question:      "Hello World",
+		InputHistory:  []string{"Hello World"},
+		OutputHistory: []string{"Hello World"},
 	}
-	cases := []struct {
-		description string
-		got         any
-		want        any
-	}{
-		{
-			description: "Purpose",
-			got:         p.GetPurpose(),
-			want:        "Respond with lame witicisms",
-		},
-		{
-			description: "Examples",
-			got:         func() []string { example, _ := p.GetExamples(); return example }(),
-			want:        []string{"How do you eat an elephant?", "What is the essence of humour?"},
-		},
-		{
-			description: "Ideals",
-			got:         func() []string { _, ideal := p.GetExamples(); return ideal }(),
-			want:        []string{"One bite at a time", "Timing"},
-		},
-		{
-			description: "Question",
-			got:         p.GetQuestion(),
-			want:        "Where do you find an elephant?",
-		},
-		{
-			description: "Images",
-			got:         p.GetImages(),
-			want: []image.Image{
-				image.NewGray(image.Rect(0, 0, 1, 1)),
-			},
-		},
-		{
-			description: "Urls",
-			got:         p.GetUrls(),
-			want:        func() []url.URL { u, _ := url.Parse("https://www.google.com"); return []url.URL{*u} }(),
-		},
+	if prompt.GetPurpose() != "You are a test Oracle" {
+		t.Errorf("Expected You are a test Oracle, got %s", prompt.GetPurpose())
 	}
-	for _, c := range cases {
-		if !cmp.Equal(c.want, c.got) {
-			t.Error(cmp.Diff(c.want, c.got))
-		}
+	if prompt.GetQuestion() != "Hello World" {
+		t.Errorf("Expected Hello World, got %s", prompt.GetQuestion())
+	}
+	inHistory, outHistory := prompt.GetHistory()
+	if !cmp.Equal(inHistory, []string{"Hello World"}) {
+		t.Fatal(cmp.Diff([]string{"Hello World"}, inHistory))
+	}
+	if !cmp.Equal(outHistory, []string{"Hello World"}) {
+		t.Fatal(cmp.Diff([]string{"Hello World"}, outHistory))
 	}
 }

@@ -3,37 +3,42 @@
 package oracle_test
 
 import (
+	"bytes"
 	"context"
 	"image"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
 )
 
 func TestGiveExample(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
+	buf := new(bytes.Buffer)
 	prompt := oracle.Prompt{
 		Purpose: "To answer if a number is odd or even in a specific format",
-		ExampleInputs: []string{
+		InputHistory: []string{
 			"2",
 			"3",
 		},
-		IdealOutputs: []string{
+		OutputHistory: []string{
 			"+++even+++",
 			"---odd---",
 		},
 		Question: "6",
+		Target:   buf,
 	}
-	answer, err := o.Completion(context.TODO(), prompt)
+	err := o.Completion(context.TODO(), prompt)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
 
-	if answer != "+++even+++" {
-		t.Errorf("Expected +++even+++, got %s", answer)
+	got := buf.String()
+	if got != "+++even+++" {
+		t.Fatal(cmp.Diff("+++even+++", got))
 	}
 }
 
@@ -51,19 +56,43 @@ func TestAsk(t *testing.T) {
 	}
 }
 
-func TestDescribeImage(t *testing.T) {
+func TestCreateImageDescribeImage(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
-	o.SetPurpose("You tell me what the color in this image is")
-	question := "What color is this?"
-	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	images := oracle.WithImages(testImage)
-	answer, err := o.DescribeImage(context.TODO(), question, images...)
+	buf := new(bytes.Buffer)
+	err := o.CreateImage(context.Background(), "please create a simple black square, nothing else", buf)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	question := "What color and shape is this?"
+	image, _, err := image.Decode(buf)
+	if err != nil {
+		t.Errorf("Error decoding image: %s", err)
+	}
+	images := oracle.WithImages(image)
+	answer, err := o.DescribeImage(context.TODO(), question, images)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
 	if !strings.Contains(answer, "black") {
 		t.Errorf("Expected black, got %s", answer)
+	}
+}
+
+func TestCreateTranscriptFromAudio(t *testing.T) {
+	t.Parallel()
+	o := newTestOracle(t)
+	buf := new(bytes.Buffer)
+	err := o.CreateAudio(context.Background(), "Hello, world!", buf)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	answer, err := o.CreateTranscript(context.Background(), buf)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	if !strings.Contains(answer, "Hello") && !strings.Contains(answer, "world") {
+		t.Errorf("Expected Hello, world!, got %s", answer)
 	}
 }
 

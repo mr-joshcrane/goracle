@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -43,16 +44,17 @@ func CreateChatGPTRequest(token string, model string, messages []Message) (*http
 
 	return req, nil
 }
-func ParseResponse(r io.Reader) (string, error) {
+func ParseResponse(r io.Reader) (io.Reader, error) {
 	resp := ChatCompletionResponse{}
 	err := json.NewDecoder(r).Decode(&resp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(resp.Choices) < 1 {
-		return "", fmt.Errorf("no choices returned")
+		return nil, fmt.Errorf("no choices returned")
 	}
-	return resp.Choices[0].Message.Content, nil
+	output := strings.NewReader(resp.Choices[0].Message.Content)
+	return output, nil
 }
 
 type ModelResponse struct {
@@ -65,19 +67,23 @@ type ModelResponse struct {
 	} `json:"data"`
 }
 
-func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (string, error) {
+func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	messages := MessageFromPrompt(prompt)
 	req, err := CreateChatGPTRequest(c.Token, c.Model, messages)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", NewClientError(resp)
+		return nil, NewClientError(resp)
 	}
 	defer resp.Body.Close()
-	return ParseResponse(resp.Body)
+	answer, err := ParseResponse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return answer, err
 }

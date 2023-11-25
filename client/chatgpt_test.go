@@ -95,7 +95,7 @@ func TestMessageFromPrompt(t *testing.T) {
 	prompt.Purpose = "A test purpose"
 
 	prompt.ExampleInputs = []string{"GivenInput", "GivenInput2"}
-	prompt.IdealOutputs = []string{"IdealOutput", "IdealOutput2"}
+	prompt.OutputHistory = []string{"IdealOutput", "IdealOutput2"}
 
 	prompt.Question = "A test question"
 
@@ -134,7 +134,7 @@ func TestMessageFromPrompt(t *testing.T) {
 func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
 	c := client.NewChatGPT("dummy-token-openai")
-	_, err := c.Completion(context.Background(), oracle.Prompt{})
+	err := c.Completion(context.Background(), oracle.Prompt{})
 	want := &client.ClientError{}
 	if !errors.As(err, want) {
 		t.Errorf("Expected %v, got %v", want, err)
@@ -147,7 +147,7 @@ func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
 	t.Parallel()
 	c := client.NewDummyClient("response", 429)
-	_, err := c.Completion(context.Background(), oracle.Prompt{})
+	err := c.Completion(context.Background(), oracle.Prompt{})
 	want := &client.RateLimitError{}
 	if !errors.As(err, want) {
 		t.Errorf("wanted %v, got %v", want, err)

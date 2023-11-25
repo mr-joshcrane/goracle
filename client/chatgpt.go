@@ -2,10 +2,8 @@ package client
 
 import (
 	"context"
-	"image"
 	"io"
-	"net/http"
-	"net/url"
+	"strings"
 )
 
 const (
@@ -17,12 +15,13 @@ const (
 // --- Prompts and Messages
 type Prompt interface {
 	GetPurpose() string
-	GetExamples() ([]string, []string)
+	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetImages() []image.Image
-	GetUrls() []url.URL
-	GetTarget() io.Writer
+}
+
+type Transform interface {
 	GetSource() io.Reader
+	GetTarget() io.ReadWriter
 }
 
 type Message struct {
@@ -36,7 +35,7 @@ func MessageFromPrompt(prompt Prompt) []Message {
 		Role:    RoleSystem,
 		Content: prompt.GetPurpose(),
 	})
-	givenInputs, idealOutputs := prompt.GetExamples()
+	givenInputs, idealOutputs := prompt.GetHistory()
 	for i, givenInput := range givenInputs {
 		messages = append(messages, Message{
 			Role:    RoleUser,
@@ -56,26 +55,28 @@ func MessageFromPrompt(prompt Prompt) []Message {
 
 // --- Dummy Client
 type Dummy struct {
-	FixedResponse  string
-	FixedHTTPError int
+	FixedResponse string
+	Failure       error
+	T             Transform
+	P             Prompt
 }
 
-func NewDummyClient(fixedResponse string, errorCode int) *Dummy {
+func NewDummyClient(FixedResponse string, err error) *Dummy {
 	return &Dummy{
-		FixedResponse:  fixedResponse,
-		FixedHTTPError: errorCode,
+		FixedResponse: FixedResponse,
+		Failure:       err,
 	}
 }
 
-func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (string, error) {
-	if d.FixedHTTPError == 200 {
-		return d.FixedResponse, nil
-	}
-	response := http.Response{
-		Status:     "client error",
-		StatusCode: d.FixedHTTPError,
-	}
-	return "", NewClientError(&response)
+func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	d.P = prompt
+	return strings.NewReader(d.FixedResponse), d.Failure
+}
+
+func (d *Dummy) Transform(ctx context.Context, transform Transform) error {
+	d.T = transform
+	_, err := io.Copy(transform.GetTarget(), transform.GetSource())
+	return err
 }
 
 // --- ChatGPT Client
@@ -92,26 +93,22 @@ func NewChatGPT(token string) *ChatGPT {
 	}
 }
 
-func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (string, error) {
-	var images []string
-
-	for _, image := range prompt.GetImages() {
-		dataURI, err := ImageToDataURI(image)
-		if err != nil {
-			return "", err
-		}
-		images = append(images, dataURI)
-	}
-
-	for _, url := range prompt.GetUrls() {
-		dataURI, err := URLToURI(url)
-		if err != nil {
-			continue
-		}
-		images = append(images, dataURI)
-	}
-	if len(images) > 0 {
-		return c.visionCompletion(ctx, prompt.GetQuestion(), images...)
-	}
+func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	return c.standardCompletion(ctx, prompt)
+}
+
+func (c *ChatGPT) audioCompletion(ctx context.Context, prompt Prompt) error {
+	_, err := GenerateSpeech(c.Token, prompt.GetQuestion())
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (c *ChatGPT) imageCompletion(ctx context.Context, prompt Prompt) ([]byte, error) {
+	return GenerateImage(c.Token, prompt.GetQuestion())
+}
+
+func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
+	return nil
 }

@@ -82,34 +82,38 @@ func CreateImageRequest(token string, prompt string) (*http.Request, error) {
 	return req, nil
 }
 
-func GenerateImage(token, prompt string) (string, error) {
+func GenerateImage(token, prompt string) ([]byte, error) {
 	req, err := CreateImageRequest(token, prompt)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println(resp.Status)
-		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var image ImageResponse
 	err = json.Unmarshal(data, &image)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(image.Data) < 1 {
-		return "", fmt.Errorf("no images returned")
+		return nil, fmt.Errorf("no images returned")
 	}
-	return image.Data[0].Url, nil
-
+	resp, err = http.DefaultClient.Get(image.Data[0].Url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
 }
 
 type VisionImageURL struct {
@@ -191,27 +195,28 @@ func CreateVisionMessage(prompt string, images ...string) VisionMessage {
 	return messages
 }
 
-func (c *ChatGPT) visionCompletion(ctx context.Context, prompt string, images ...string) (string, error) {
+func (c *ChatGPT) visionCompletion(ctx context.Context, target io.Writer, prompt string, images ...string) error {
 	message := CreateVisionMessage(prompt, images...)
 	req, err := CreateVisionRequest(c.Token, message)
 	if err != nil {
-		return "", err
+		return err
 	}
 	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
-		return "", err
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", NewClientError(resp)
+		return NewClientError(resp)
 	}
 	defer resp.Body.Close()
 	var completion VisionCompletionResponse
 	err = json.NewDecoder(resp.Body).Decode(&completion)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if len(completion.Choices) < 1 {
-		return "", fmt.Errorf("no choices returned")
+		return fmt.Errorf("no choices returned")
 	}
-	return completion.Choices[0].Message.Content, nil
+	_, err = fmt.Fprint(target, completion.Choices[0].Message.Content)
+	return err
 }
