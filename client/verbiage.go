@@ -16,17 +16,17 @@ const (
 )
 
 type ChatCompletionRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
+	Model    string   `json:"model"`
+	Messages Messages `json:"messages"`
 }
 
 type ChatCompletionResponse struct {
 	Choices []struct {
-		Message Message `json:"message"`
+		Message TextMessage `json:"message"`
 	} `json:"choices"`
 }
 
-func CreateChatGPTRequest(token string, model string, messages []Message) (*http.Request, error) {
+func CreateChatGPTRequest(token string, model string, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
 		Model:    model,
@@ -69,6 +69,11 @@ type ModelResponse struct {
 
 func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	messages := MessageFromPrompt(prompt)
+	for _, message := range messages {
+		if message.GetFormat() == MessageImage {
+			return c.visionCompletion(ctx, messages)
+		}
+	}
 	req, err := CreateChatGPTRequest(c.Token, c.Model, messages)
 	if err != nil {
 		return nil, err

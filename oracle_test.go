@@ -3,6 +3,7 @@ package oracle_test
 import (
 	"bytes"
 	"context"
+	"image"
 	"io"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ import (
 	"github.com/mr-joshcrane/oracle/client"
 )
 
-var IgnoreReader = cmpopts.IgnoreUnexported(strings.Reader{}, bytes.Reader{}, oracle.DocumentRef{})
+var IgnoreReader = cmpopts.IgnoreUnexported(oracle.ImageRef{}, strings.Reader{}, bytes.Reader{}, oracle.DocumentRef{})
 
 func ctx() context.Context {
 	return context.TODO()
@@ -184,4 +185,25 @@ func TestAsk_NewDocuments(t *testing.T) {
 	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
 		t.Errorf("Expected It's time to shine again, got %s", got)
 	}
+}
+
+func TestAsk_NewVisuals(t *testing.T) {
+	t.Parallel()
+	o, c := createTestOracle("", nil)
+	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	visuals := oracle.NewVisuals(v)
+
+	_, err := o.Ask(ctx(), "Hello World", visuals)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	want := oracle.Prompt{
+		Purpose:    "You are a test Oracle",
+		Question:   "Hello World",
+		References: visuals,
+	}
+	if !cmp.Equal(c.P, want, IgnoreReader) {
+		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	}
+
 }

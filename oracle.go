@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image"
+	"image/png"
 	"io"
 	"strings"
 
@@ -128,6 +129,37 @@ type Reference interface {
 
 type DocumentRef struct {
 	contents io.Reader
+}
+
+type ImageRef struct {
+	image image.Image
+	buf   *bytes.Buffer
+}
+
+func (i *ImageRef) Read(p []byte) (int, error) {
+	if i.buf == nil {
+		i.buf = new(bytes.Buffer)
+		err := png.Encode(i.buf, i.image)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if i.buf.Len() == 0 {
+		// Nothing left to read
+		return 0, io.EOF
+	}
+
+	// Read from the buffer into p
+	return i.buf.Read(p)
+}
+
+func NewVisuals(images ...image.Image) []io.Reader {
+	var refs []io.Reader
+	for _, i := range images {
+		refs = append(refs, &ImageRef{i, nil})
+	}
+	return refs
 }
 
 func (i DocumentRef) Read(v []byte) (int, error) {

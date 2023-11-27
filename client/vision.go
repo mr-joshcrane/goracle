@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -27,6 +28,12 @@ func ImageToDataURI(img image.Image) (string, error) {
 	base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
 	dataURI := "data:image/png;base64," + base64Str
 	return dataURI, nil
+}
+
+func PNGToDataURI(data []byte) string {
+	base64Str := base64.StdEncoding.EncodeToString(data)
+	dataURI := "data:image/png;base64," + base64Str
+	return dataURI
 }
 
 func URLToURI(url url.URL) (string, error) {
@@ -128,17 +135,21 @@ type VisionMessage struct {
 	Content []map[string]string `json:"content"`
 }
 
-type VisionRequest struct {
-	Model     string          `json:"model"`
-	Messages  []VisionMessage `json:"messages"`
-	MaxTokens int             `json:"max_tokens"`
+func (m VisionMessage) GetFormat() string {
+	return MessageImage
 }
 
-func CreateVisionRequest(token string, message VisionMessage) (*http.Request, error) {
+type VisionRequest struct {
+	Model     string   `json:"model"`
+	Messages  Messages `json:"messages"`
+	MaxTokens int      `json:"max_tokens"`
+}
+
+func CreateVisionRequest(token string, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(VisionRequest{
 		Model:     GPT4V,
-		Messages:  []VisionMessage{message},
+		Messages:  messages,
 		MaxTokens: 300,
 	})
 	if err != nil {
@@ -195,28 +206,31 @@ func CreateVisionMessage(prompt string, images ...string) VisionMessage {
 	return messages
 }
 
-func (c *ChatGPT) visionCompletion(ctx context.Context, target io.Writer, prompt string, images ...string) error {
-	message := CreateVisionMessage(prompt, images...)
+func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Reader, error) {
 	req, err := CreateVisionRequest(c.Token, message)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return NewClientError(resp)
+		return nil, NewClientError(resp)
 	}
 	defer resp.Body.Close()
 	var completion VisionCompletionResponse
 	err = json.NewDecoder(resp.Body).Decode(&completion)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(completion.Choices) < 1 {
-		return fmt.Errorf("no choices returned")
+		return nil, fmt.Errorf("no choices returned")
 	}
-	_, err = fmt.Fprint(target, completion.Choices[0].Message.Content)
-	return err
+	answer := strings.NewReader(completion.Choices[0].Message.Content)
+	return answer, nil
+}
+
+func isPNG(a []byte) bool {
+	return len(a) > 8 && bytes.Equal(a[:8], []byte("\x89PNG\x0d\x0a\x1a\x0a"))
 }

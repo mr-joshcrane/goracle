@@ -13,6 +13,12 @@ const (
 	RoleAssistant = "assistant"
 )
 
+const (
+	MessageText  = "text"
+	MessageImage = "image"
+	MessageAudio = "audio"
+)
+
 // --- Prompts and Messages
 type Prompt interface {
 	GetPurpose() string
@@ -26,9 +32,19 @@ type Transform interface {
 	GetTarget() io.ReadWriter
 }
 
-type Message struct {
+type Messages []Message
+
+type Message interface {
+	GetFormat() string
+}
+
+type TextMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+func (t TextMessage) GetFormat() string {
+	return MessageText
 }
 
 type Reference struct {
@@ -39,24 +55,24 @@ func (r Reference) Value() ([]byte, error) {
 	return io.ReadAll(r.Contents)
 }
 
-func MessageFromPrompt(prompt Prompt) []Message {
+func MessageFromPrompt(prompt Prompt) Messages {
 	messages := []Message{}
-	messages = append(messages, Message{
+	messages = append(messages, TextMessage{
 		Role:    RoleSystem,
 		Content: prompt.GetPurpose(),
 	})
 	givenInputs, idealOutputs := prompt.GetHistory()
 	for i, givenInput := range givenInputs {
-		messages = append(messages, Message{
+		messages = append(messages, TextMessage{
 			Role:    RoleUser,
 			Content: givenInput,
 		})
-		messages = append(messages, Message{
+		messages = append(messages, TextMessage{
 			Role:    RoleAssistant,
 			Content: idealOutputs[i],
 		})
 	}
-	messages = append(messages, Message{
+	messages = append(messages, TextMessage{
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
@@ -66,12 +82,19 @@ func MessageFromPrompt(prompt Prompt) []Message {
 		if err != nil {
 			contents = []byte(fmt.Sprintf("Error reading reference: %v", err))
 		}
-		messages = append(messages, Message{
+		if isPNG(contents) {
+			uri := PNGToDataURI(contents)
+			messages = append(messages, VisionMessage{
+				Role:    RoleUser,
+				Content: []map[string]string{{"type": "image_url", "image_url": uri}},
+			})
+			continue
+		}
+		messages = append(messages, TextMessage{
 			Role:    RoleUser,
 			Content: fmt.Sprintf("Reference %d: %s", i, contents),
 		})
 	}
-
 	return messages
 }
 

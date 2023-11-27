@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"image"
 	"os"
 
 	"github.com/mr-joshcrane/oracle"
@@ -15,16 +16,9 @@ func main() {
 		os.Exit(1)
 	}
 	o := oracle.NewOracle(token)
-	//f1 := strings.NewReader("I love tomatos")
-	//f2 := strings.NewReader("I am a big fan of tomatos")
-	//f3 := strings.NewReader("I hate tomatoes")
-	f1, _ := os.Open("file1.txt")
-	f2, _ := os.Open("file2.txt")
-	f3, _ := os.Open("file3.txt")
-
-	docs := oracle.NewDocuments(f1, f2, f3)
-
-	answer, err := o.Ask(context.Background(), "I recieved letters. What do they say?", docs)
+	f1 := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	vis := oracle.NewVisuals(f1)
+	answer, err := o.Ask(context.Background(), "What is this?", vis)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

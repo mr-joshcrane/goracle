@@ -22,7 +22,7 @@ import (
 
 func TestGetChatCompletionsRequestHeaders(t *testing.T) {
 	t.Parallel()
-	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, []client.Message{})
+	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, []client.TextMessage{})
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
@@ -38,7 +38,7 @@ func TestGetChatCompletionsRequestHeaders(t *testing.T) {
 
 func TestGetChatCompletionsRequestBody(t *testing.T) {
 	t.Parallel()
-	messages := []client.Message{
+	messages := []client.TextMessage{
 		{
 			Role:    "user",
 			Content: "Say this is a test!",
@@ -99,7 +99,7 @@ func TestMessageFromPrompt(t *testing.T) {
 
 	prompt.Question = "A test question"
 
-	want := []client.Message{
+	want := []client.TextMessage{
 		{
 			Role:    "system",
 			Content: "A test purpose",
