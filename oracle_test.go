@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/mr-joshcrane/oracle"
 	"github.com/mr-joshcrane/oracle/client"
 )
+
+var IgnoreReader = cmpopts.IgnoreUnexported(bytes.Reader{}, oracle.DocumentRef{})
 
 func ctx() context.Context {
 	return context.TODO()
@@ -115,5 +119,76 @@ func TestPromptAccessorMethods(t *testing.T) {
 	}
 	if !cmp.Equal(outHistory, []string{"Hello World"}) {
 		t.Fatal(cmp.Diff([]string{"Hello World"}, outHistory))
+	}
+}
+
+func TestAsk_NewDocument(t *testing.T) {
+	t.Parallel()
+	r := strings.NewReader("It's time to shine")
+	o, c := createTestOracle("", nil)
+	document := oracle.NewDocuments(r)
+	_, err := o.Ask(ctx(), "Hello World", document)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	want := oracle.Prompt{
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
+		References: []io.Reader{
+			document,
+		},
+	}
+	if !cmp.Equal(c.P, want, IgnoreReader) {
+		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	}
+	data := c.P.GetReferences()[0]
+	got, err := io.ReadAll(data)
+	if err != nil {
+		t.Errorf("Error reading reference: %s", err)
+	}
+	if !cmp.Equal(got, []byte("It's time to shine")) {
+		t.Errorf("Expected It's time to shine, got %s", got)
+	}
+}
+
+func TestAsk_NewDocuments(t *testing.T) {
+	t.Parallel()
+	o, c := createTestOracle("", nil)
+	r1 := strings.NewReader("It's time to shine")
+	r2 := strings.NewReader("It's time to shine again")
+	document1 := oracle.NewDocument(r1)
+	document2 := oracle.NewDocument(r2)
+
+	documents := oracle.NewDocuments(document1, document2)
+	_, err := o.Ask(ctx(), "Hello World", documents)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	want := oracle.Prompt{
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
+		References: []io.Reader{
+			document1,
+			document2,
+		},
+	}
+	if !cmp.Equal(c.P, want, IgnoreReader) {
+		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	}
+	data := c.P.GetReferences()[0]
+	got, err := io.ReadAll(data)
+	if err != nil {
+		t.Errorf("Error reading reference: %s", err)
+	}
+	if !cmp.Equal(got, []byte("It's time to shine")) {
+		t.Errorf("Expected It's time to shine, got %s", got)
+	}
+	data = c.P.GetReferences()[1]
+	got, err = io.ReadAll(data)
+	if err != nil {
+		t.Errorf("Error reading reference: %s", err)
+	}
+	if !cmp.Equal(got, []byte("It's time to shine again")) {
+		t.Errorf("Expected It's time to shine again, got %s", got)
 	}
 }

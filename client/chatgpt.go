@@ -17,6 +17,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
+	GetReferences() []io.Reader
 }
 
 type Transform interface {
@@ -27,6 +28,14 @@ type Transform interface {
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+type Reference struct {
+	Contents io.Reader
+}
+
+func (r Reference) Value() ([]byte, error) {
+	return io.ReadAll(r.Contents)
 }
 
 func MessageFromPrompt(prompt Prompt) []Message {

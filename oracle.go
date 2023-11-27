@@ -49,6 +49,10 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
+func (p Prompt) GetReferences() []io.Reader {
+	return p.References
+}
+
 // LanguageModel is an interface that abstracts a concrete implementation of our
 // language model API call.
 type LanguageModel interface {
@@ -93,13 +97,15 @@ func NewOracle(token string, opts ...Option) *Oracle {
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string) Prompt {
-	return Prompt{
+func (o *Oracle) GeneratePrompt(question string, references ...io.Reader) Prompt {
+	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
 		OutputHistory: o.previousOutputs,
 		Question:      question,
 	}
+	p.References = append(p.References, references...)
+	return p
 }
 
 // SetPurpose sets the purpose of the Oracle, which frames the models response.
@@ -114,10 +120,28 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.previousOutputs = append(o.previousOutputs, idealCompletion)
 }
 
+type Reference interface {
+	Read([]byte) (int, error)
+}
+
+type DocumentRef struct {
+	contents io.Reader
+}
+
+func (i DocumentRef) Read(v []byte) (int, error) {
+	return i.contents.Read(v)
+}
+
+func NewDocument(r io.Reader) DocumentRef {
+	return DocumentRef{
+		contents: r,
+	}
+}
+
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string) (string, error) {
-	prompt := o.GeneratePrompt(question)
+func (o Oracle) Ask(ctx context.Context, question string, references ...io.Reader) (string, error) {
+	prompt := o.GeneratePrompt(question, references...)
 	data, err := o.Completion(ctx, prompt)
 	if err != nil {
 		return "", err
@@ -162,5 +186,5 @@ func (o *Oracle) Reset() {
 	o.purpose = ""
 	o.previousInputs = []string{}
 	o.previousOutputs = []string{}
-	o.artifacts = map[string]image.Image{}
+	o.artifacts = make(map[string]image.Image)
 }
