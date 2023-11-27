@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -59,6 +60,18 @@ func MessageFromPrompt(prompt Prompt) []Message {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
+	for i, reference := range prompt.GetReferences() {
+		i++
+		contents, err := io.ReadAll(reference)
+		if err != nil {
+			contents = []byte(fmt.Sprintf("Error reading reference: %v", err))
+		}
+		messages = append(messages, Message{
+			Role:    RoleUser,
+			Content: fmt.Sprintf("Reference %d: %s", i, contents),
+		})
+	}
+
 	return messages
 }
 

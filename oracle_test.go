@@ -13,7 +13,7 @@ import (
 	"github.com/mr-joshcrane/oracle/client"
 )
 
-var IgnoreReader = cmpopts.IgnoreUnexported(bytes.Reader{}, oracle.DocumentRef{})
+var IgnoreReader = cmpopts.IgnoreUnexported(strings.Reader{}, bytes.Reader{}, oracle.DocumentRef{})
 
 func ctx() context.Context {
 	return context.TODO()
@@ -132,11 +132,9 @@ func TestAsk_NewDocument(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:  "You are a test Oracle",
-		Question: "Hello World",
-		References: []io.Reader{
-			document,
-		},
+		Purpose:    "You are a test Oracle",
+		Question:   "Hello World",
+		References: document,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
@@ -156,21 +154,16 @@ func TestAsk_NewDocuments(t *testing.T) {
 	o, c := createTestOracle("", nil)
 	r1 := strings.NewReader("It's time to shine")
 	r2 := strings.NewReader("It's time to shine again")
-	document1 := oracle.NewDocument(r1)
-	document2 := oracle.NewDocument(r2)
+	documents := oracle.NewDocuments(r1, r2)
 
-	documents := oracle.NewDocuments(document1, document2)
 	_, err := o.Ask(ctx(), "Hello World", documents)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:  "You are a test Oracle",
-		Question: "Hello World",
-		References: []io.Reader{
-			document1,
-			document2,
-		},
+		Purpose:    "You are a test Oracle",
+		Question:   "Hello World",
+		References: documents,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
@@ -180,7 +173,7 @@ func TestAsk_NewDocuments(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading reference: %s", err)
 	}
-	if !cmp.Equal(got, []byte("It's time to shine")) {
+	if !cmp.Equal(got, []byte("It's time to shine"), IgnoreReader) {
 		t.Errorf("Expected It's time to shine, got %s", got)
 	}
 	data = c.P.GetReferences()[1]
@@ -188,7 +181,7 @@ func TestAsk_NewDocuments(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading reference: %s", err)
 	}
-	if !cmp.Equal(got, []byte("It's time to shine again")) {
+	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
 		t.Errorf("Expected It's time to shine again, got %s", got)
 	}
 }

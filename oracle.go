@@ -97,14 +97,16 @@ func NewOracle(token string, opts ...Option) *Oracle {
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, references ...io.Reader) Prompt {
+func (o *Oracle) GeneratePrompt(question string, references ...[]io.Reader) Prompt {
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
 		OutputHistory: o.previousOutputs,
 		Question:      question,
 	}
-	p.References = append(p.References, references...)
+	for _, r := range references {
+		p.References = append(p.References, r...)
+	}
 	return p
 }
 
@@ -132,15 +134,13 @@ func (i DocumentRef) Read(v []byte) (int, error) {
 	return i.contents.Read(v)
 }
 
-func NewDocument(r io.Reader) DocumentRef {
-	return DocumentRef{
-		contents: r,
-	}
+func NewDocuments(r io.Reader, a ...io.Reader) []io.Reader {
+	return append([]io.Reader{DocumentRef{r}}, a...)
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string, references ...io.Reader) (string, error) {
+func (o Oracle) Ask(ctx context.Context, question string, references ...[]io.Reader) (string, error) {
 	prompt := o.GeneratePrompt(question, references...)
 	data, err := o.Completion(ctx, prompt)
 	if err != nil {
