@@ -68,12 +68,12 @@ type ImageResponse struct {
 	} `json:"data"`
 }
 
-func CreateImageRequest(token string, prompt string) (*http.Request, error) {
+func (c *ChatGPT) CreateImageRequest(prompt string, n int) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ImageRequest{
 		Model:  DALLE3,
 		Prompt: prompt,
-		N:      1,
+		N:      n,
 		Size:   "1024x1024",
 	})
 	if err != nil {
@@ -83,44 +83,39 @@ func CreateImageRequest(token string, prompt string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
 	return req, nil
 }
 
-func GenerateImage(token, prompt string) ([]byte, error) {
-	req, err := CreateImageRequest(token, prompt)
+func (c *ChatGPT) GenerateImage(prompt string, n int) (ImageResponse, error) {
+	var image ImageResponse
+	req, err := c.CreateImageRequest(prompt, n)
 	if err != nil {
-		return nil, err
+		return image, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return image, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println(resp.Status)
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return image, fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return image, err
 	}
-	var image ImageResponse
 	err = json.Unmarshal(data, &image)
 	if err != nil {
-		return nil, err
+		return image, err
 	}
 	if len(image.Data) < 1 {
-		return nil, fmt.Errorf("no images returned")
+		return image, fmt.Errorf("no images returned")
 	}
-	resp, err = http.DefaultClient.Get(image.Data[0].Url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	return image, nil
 }
 
 type VisionImageURL struct {

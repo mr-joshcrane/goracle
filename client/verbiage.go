@@ -68,6 +68,30 @@ type ModelResponse struct {
 }
 
 func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	artifacts := []io.ReadWriter{}
+	reference := prompt.GetReferences()
+	for _, reference := range reference {
+		_, ok := reference.(io.Writer)
+		if ok {
+			artifacts = append(artifacts, Artifact{Contents: reference.(io.ReadWriter)})
+		}
+	}
+	if len(artifacts) > 0 {
+		img, err := c.GenerateImage(prompt.GetQuestion(), len(artifacts))
+		if err != nil {
+			return nil, err
+		}
+		links := make([]string, len(img.Data))
+		for i, link := range img.Data {
+			_, err := artifacts[i].Write([]byte(link.Url))
+			if err != nil {
+				return nil, err
+			}
+			links[i] = link.Url
+		}
+		l := strings.Join(links, "\n")
+		return strings.NewReader(l), nil
+	}
 	messages := MessageFromPrompt(prompt)
 	for _, message := range messages {
 		if message.GetFormat() == MessageImage {

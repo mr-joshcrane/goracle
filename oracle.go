@@ -17,7 +17,7 @@ type Prompt struct {
 	Purpose       string
 	InputHistory  []string
 	OutputHistory []string
-	References    []io.Reader
+	References    References
 	Question      string
 }
 
@@ -51,7 +51,15 @@ func (p Prompt) GetQuestion() string {
 }
 
 func (p Prompt) GetReferences() []io.Reader {
-	return p.References
+	references := []io.Reader{}
+	for _, ref := range p.References {
+		data, err := ref.GetContent()
+		if err != nil {
+			continue
+		}
+		references = append(references, bytes.NewReader(data))
+	}
+	return references
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -98,15 +106,17 @@ func NewOracle(token string, opts ...Option) *Oracle {
 
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, references ...[]io.Reader) Prompt {
+func (o *Oracle) GeneratePrompt(question string, references ...References) Prompt {
+	refs := References{}
+	for _, r := range references {
+		refs = append(refs, r...)
+	}
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
 		OutputHistory: o.previousOutputs,
 		Question:      question,
-	}
-	for _, r := range references {
-		p.References = append(p.References, r...)
+		References:    refs,
 	}
 	return p
 }
@@ -124,8 +134,10 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 }
 
 type Reference interface {
-	Read([]byte) (int, error)
+	GetContent() ([]byte, error)
 }
+
+type References []Reference
 
 type DocumentRef struct {
 	contents io.Reader
@@ -133,46 +145,65 @@ type DocumentRef struct {
 
 type ImageRef struct {
 	image image.Image
-	buf   *bytes.Buffer
 }
 
-func (i *ImageRef) Read(p []byte) (int, error) {
-	if i.buf == nil {
-		i.buf = new(bytes.Buffer)
-		err := png.Encode(i.buf, i.image)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	if i.buf.Len() == 0 {
-		// Nothing left to read
-		return 0, io.EOF
-	}
-
-	// Read from the buffer into p
-	return i.buf.Read(p)
+type ArtifactRef struct {
+	contents io.ReadWriter
 }
 
-func NewVisuals(images ...image.Image) []io.Reader {
-	var refs []io.Reader
-	for _, i := range images {
-		refs = append(refs, &ImageRef{i, nil})
+func (i *ImageRef) GetContent() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, i.image)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func NewVisuals(image image.Image, images ...image.Image) References {
+	refs := []Reference{&ImageRef{image: image}}
+	for _, image := range images {
+		refs = append(refs, &ImageRef{image: image})
 	}
 	return refs
 }
 
-func (i DocumentRef) Read(v []byte) (int, error) {
-	return i.contents.Read(v)
+func (i DocumentRef) GetContent() ([]byte, error) {
+	data, err := io.ReadAll(i.contents)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
-func NewDocuments(r io.Reader, a ...io.Reader) []io.Reader {
-	return append([]io.Reader{DocumentRef{r}}, a...)
+func NewDocuments(r io.Reader, a ...io.Reader) References {
+	refs := []Reference{DocumentRef{r}}
+	for _, doc := range a {
+		refs = append(refs, DocumentRef{doc})
+	}
+	return refs
+}
+
+func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
+	references := References{}
+	references = append(references, ArtifactRef{artifact})
+	for _, artifact := range a {
+		references = append(references, ArtifactRef{artifact})
+	}
+	return references
+}
+
+func (a ArtifactRef) GetContent() ([]byte, error) {
+	data, err := io.ReadAll(a.contents)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string, references ...[]io.Reader) (string, error) {
+func (o Oracle) Ask(ctx context.Context, question string, references ...References) (string, error) {
 	prompt := o.GeneratePrompt(question, references...)
 	data, err := o.Completion(ctx, prompt)
 	if err != nil {

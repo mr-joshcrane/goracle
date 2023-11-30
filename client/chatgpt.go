@@ -47,12 +47,46 @@ func (t TextMessage) GetFormat() string {
 	return MessageText
 }
 
-type Reference struct {
+func References(p Prompt) (refs []ReadReference) {
+	for _, reference := range p.GetReferences() {
+		_, ok := reference.(WriteReference)
+		if ok {
+			continue
+		}
+		r, ok := reference.(ReadReference)
+		if ok {
+			refs = append(refs, r)
+		}
+	}
+	return refs
+}
+
+func Artifacts(p Prompt) (artifacts []WriteReference) {
+	for _, reference := range p.GetReferences() {
+		_, ok := reference.(WriteReference)
+		if ok {
+			fmt.Println("Found artifact")
+			artifacts = append(artifacts, reference.(WriteReference))
+		}
+	}
+	return artifacts
+}
+
+type ReadReference struct {
 	Contents io.Reader
 }
 
-func (r Reference) Value() ([]byte, error) {
-	return io.ReadAll(r.Contents)
+func (r ReadReference) Read(v []byte) (int, error) {
+	return r.Contents.Read(v)
+}
+
+type WriteReference struct {
+	Contents io.Reader
+	target   io.ReadWriter
+}
+
+func (w WriteReference) Read(v []byte) (int, error) {
+	return w.Contents.Read(v)
 }
 
 func MessageFromPrompt(prompt Prompt) Messages {
@@ -76,7 +110,8 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
-	for i, reference := range prompt.GetReferences() {
+	refs := prompt.GetReferences()
+	for i, reference := range refs {
 		i++
 		contents, err := io.ReadAll(reference)
 		if err != nil {
@@ -96,6 +131,18 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		})
 	}
 	return messages
+}
+
+type Artifact struct {
+	Contents io.ReadWriter
+}
+
+func (a Artifact) Write(p []byte) (int, error) {
+	return a.Contents.Write(p)
+}
+
+func (a Artifact) Read(p []byte) (int, error) {
+	return a.Contents.Read(p)
 }
 
 // --- Dummy Client
@@ -148,10 +195,6 @@ func (c *ChatGPT) audioCompletion(ctx context.Context, prompt Prompt) error {
 		return err
 	}
 	return err
-}
-
-func (c *ChatGPT) imageCompletion(ctx context.Context, prompt Prompt) ([]byte, error) {
-	return GenerateImage(c.Token, prompt.GetQuestion())
 }
 
 func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
