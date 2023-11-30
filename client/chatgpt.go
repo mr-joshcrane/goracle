@@ -65,7 +65,6 @@ func Artifacts(p Prompt) (artifacts []WriteReference) {
 	for _, reference := range p.GetReferences() {
 		_, ok := reference.(WriteReference)
 		if ok {
-			fmt.Println("Found artifact")
 			artifacts = append(artifacts, reference.(WriteReference))
 		}
 	}
