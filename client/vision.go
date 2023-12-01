@@ -150,7 +150,7 @@ type VisionCompletionResponse struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
-	}
+	} `json:"choices"`
 }
 
 func CreateVisionRequest(token string, messages Messages) (*http.Request, error) {

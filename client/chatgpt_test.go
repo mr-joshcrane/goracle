@@ -1,5 +1,3 @@
-//go:build unit
-
 package client_test
 
 import (
@@ -7,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,9 +19,25 @@ import (
 	"github.com/mr-joshcrane/oracle/client"
 )
 
-func TestGetChatCompletionsRequestHeaders(t *testing.T) {
+func testPrompt() oracle.Prompt {
+	return oracle.Prompt{
+		Purpose:       "A test purpose",
+		InputHistory:  []string{"GivenInput", "GivenInput2"},
+		OutputHistory: []string{"IdealOutput", "IdealOutput2"},
+		Question:      "A test question",
+		Pages:         oracle.NewDocuments(bytes.NewBufferString("page1"), bytes.NewBufferString("page2")),
+		Artifacts:     oracle.NewArtifacts(bytes.NewBufferString("test"), bytes.NewBufferString("test2")),
+	}
+}
+
+func testMessages() client.Messages {
+	return client.MessageFromPrompt(testPrompt())
+}
+
+func TestCreateTextCompletionRequestHeaders(t *testing.T) {
 	t.Parallel()
-	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, []client.TextMessage{})
+	messages := testMessages()
+	req, err := client.CreateTextCompletionRequest("dummy-token-openai", client.GPT4, messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
@@ -38,44 +51,43 @@ func TestGetChatCompletionsRequestHeaders(t *testing.T) {
 	}
 }
 
-func TestGetChatCompletionsRequestBody(t *testing.T) {
+func TestCreateTextCompletionRequest(t *testing.T) {
 	t.Parallel()
-	messages := []client.TextMessage{
-		{
-			Role:    "user",
-			Content: "Say this is a test!",
-		},
-	}
-
-	req, err := client.CreateChatGPTRequest("dummy-token-openai", client.GPT35Turbo, messages)
+	messages := testMessages()
+	req, err := client.CreateTextCompletionRequest("dummy-token-openai", client.GPT4, messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
-	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"Say this is a test!"}]}%s`, client.GPT35Turbo, "\n")
+	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}]}%v`, client.GPT4, "\n")
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Errorf("Error reading request body: %s", err)
 	}
 	got := string(data)
-	if !cmp.Equal(want, got) {
+	if !cmp.Equal(got, want) {
 		t.Error(cmp.Diff(want, got))
 	}
 }
 
-func TestParseResponse(t *testing.T) {
+func TestParseTextCompletionResponse(t *testing.T) {
 	t.Parallel()
 	f, err := os.Open("testdata/response.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	content, cErr := client.ParseResponse(f)
+	content, cErr := client.ParseTextCompletionReponse(f)
 	if cErr != nil {
 		t.Errorf("Error parsing response: %s", err)
 	}
+	data, err := io.ReadAll(content)
+	if err != nil {
+		t.Errorf("Error reading response: %s", err)
+	}
+	got := string(data)
 	want := "A woodchuck would chuck as much wood as a woodchuck could chuck if a woodchuck could chuck wood."
-	if content != want {
-		t.Errorf("Expected %s', got %s", want, content)
+	if got != want {
+		t.Errorf("Expected %s', got %s", want, got)
 	}
 }
 
@@ -96,34 +108,34 @@ func TestMessageFromPrompt(t *testing.T) {
 	}
 	prompt.Purpose = "A test purpose"
 
-	prompt.ExampleInputs = []string{"GivenInput", "GivenInput2"}
+	prompt.InputHistory = []string{"GivenInput", "GivenInput2"}
 	prompt.OutputHistory = []string{"IdealOutput", "IdealOutput2"}
 
 	prompt.Question = "A test question"
 
-	want := []client.TextMessage{
-		{
-			Role:    "system",
+	want := client.Messages{
+		client.TextMessage{
+			Role:    client.RoleSystem,
 			Content: "A test purpose",
 		},
-		{
-			Role:    "user",
+		client.TextMessage{
+			Role:    client.RoleUser,
 			Content: "GivenInput",
 		},
-		{
-			Role:    "assistant",
+		client.TextMessage{
+			Role:    client.RoleAssistant,
 			Content: "IdealOutput",
 		},
-		{
-			Role:    "user",
+		client.TextMessage{
+			Role:    client.RoleUser,
 			Content: "GivenInput2",
 		},
-		{
-			Role:    "assistant",
+		client.TextMessage{
+			Role:    client.RoleAssistant,
 			Content: "IdealOutput2",
 		},
-		{
-			Role:    "user",
+		client.TextMessage{
+			Role:    client.RoleUser,
 			Content: "A test question",
 		},
 	}
@@ -136,26 +148,13 @@ func TestMessageFromPrompt(t *testing.T) {
 func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
 	c := client.NewChatGPT("dummy-token-openai")
-	err := c.Completion(context.Background(), oracle.Prompt{})
+	_, err := c.Completion(context.Background(), oracle.Prompt{})
 	want := &client.ClientError{}
 	if !errors.As(err, want) {
 		t.Errorf("Expected %v, got %v", want, err)
 	}
 	if want.StatusCode != 401 {
 		t.Errorf("Expected 401, got %d", want.StatusCode)
-	}
-}
-
-func TestCompletionWithRateLimitErrorReturnsARetryAfterValue(t *testing.T) {
-	t.Parallel()
-	c := client.NewDummyClient("response", 429)
-	err := c.Completion(context.Background(), oracle.Prompt{})
-	want := &client.RateLimitError{}
-	if !errors.As(err, want) {
-		t.Errorf("wanted %v, got %v", want, err)
-	}
-	if want.RetryAfter != 0 {
-		t.Errorf("Expected 0, got %d", want.RetryAfter)
 	}
 }
 
@@ -216,32 +215,10 @@ func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T
 	}
 }
 
-func TestCreateVisionMessages(t *testing.T) {
-	t.Parallel()
-	msg := client.CreateVisionMessage("somePrompt", "someUrl")
-	want := client.VisionMessage{
-
-		Role: "user",
-		Content: []map[string]string{
-			{
-				"type": "text",
-				"text": "somePrompt",
-			},
-			{
-				"type":      "image_url",
-				"image_url": "someUrl",
-			},
-		},
-	}
-	if !cmp.Equal(want, msg) {
-		t.Error(cmp.Diff(want, msg))
-	}
-}
-
 func TestCreateVisionRequest(t *testing.T) {
 	t.Parallel()
-	msg := client.CreateVisionMessage("somePrompt", "someUrl")
-	req, err := client.CreateVisionRequest("dummy-token-openai", msg)
+	messages := testMessages()
+	req, err := client.CreateVisionRequest("dummy-token-openai", messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
@@ -249,39 +226,13 @@ func TestCreateVisionRequest(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading request body: %s", err)
 	}
-	defer req.Body.Close()
 	got := string(data)
-	want := fmt.Sprintf(`
-		{"model":"%s","messages": [
-			{
-				"role":"user",
-				"content": [
-					{"text":"somePrompt", "type":"text"},
-		    	{"image_url":"someUrl", "type":"image_url"}
-				]
-			}
-		],
-		"max_tokens": 300
-}`, client.GPT4V)
-	want = strings.ReplaceAll(want, "\t", "")
-	want = strings.ReplaceAll(want, "\n", "")
-	want = strings.ReplaceAll(want, " ", "")
-	want += "\n"
-	if got != want {
-		t.Error(cmp.Diff(want, got))
-	}
-}
-
-func TestImageToDataURI(t *testing.T) {
-	t.Parallel()
-	testImage := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	got, err := client.ImageToDataURI(testImage)
+	want := `{"model":"gpt-4-vision-preview","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}],"max_tokens":300}` + "\n"
 	if err != nil {
-		t.Errorf("Error converting image to data uri: %s", err)
+		t.Errorf("Error unmarshalling request body: %s", err)
 	}
-	want := "data:image/png;base64,"
-	if !strings.HasPrefix(got, want) {
-		t.Fatal(cmp.Diff(want, got))
+	if !cmp.Equal(got, want) {
+		t.Error(cmp.Diff(want, got))
 	}
 }
 

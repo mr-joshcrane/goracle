@@ -174,15 +174,3 @@ func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
 	}
 	return fmt.Errorf("unknown transform source, %v", reflect.TypeOf(source).String())
 }
-
-func chunkify(data string, chunkSize int) []string {
-	var chunks []string
-	for i := 0; i < len(data); i += chunkSize {
-		end := i + chunkSize
-		if end > len(data) {
-			end = len(data)
-		}
-		chunks = append(chunks, data[i:end])
-	}
-	return chunks
-}

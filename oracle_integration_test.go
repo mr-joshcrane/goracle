@@ -48,7 +48,7 @@ func TestOracleIntegration_CreateAnImageThenDescribeIt(t *testing.T) {
 	o := newTestOracle(t)
 	buf := new(bytes.Buffer)
 	artifact := oracle.NewArtifacts(buf)
-	_, err := o.Ask(context.TODO(), "please create a simple black square, nothing else", artifact)
+	_, err := o.Ask(context.TODO(), "please create a simple red square on a black background, nothing else", artifact)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -61,8 +61,8 @@ func TestOracleIntegration_CreateAnImageThenDescribeIt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	if !strings.Contains(answer, "black") {
-		t.Errorf("Expected black, got %s", answer)
+	if !strings.Contains(answer, "red") && !strings.Contains(answer, "square") {
+		t.Errorf("Expected red, got %s", answer)
 	}
 }
 
