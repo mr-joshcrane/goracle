@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -25,6 +24,29 @@ type ChatCompletionResponse struct {
 	Choices []struct {
 		Message TextMessage `json:"message"`
 	} `json:"choices"`
+}
+
+func standardCompletion(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
+	messages := MessageFromPrompt(prompt)
+	req, err := CreateChatGPTRequest(token, GPT4, messages)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewClientError(resp)
+	}
+	defer resp.Body.Close()
+	answer, err := ParseResponse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return answer, err
+
 }
 
 func CreateChatGPTRequest(token string, model string, messages Messages) (*http.Request, error) {
@@ -57,30 +79,10 @@ func ParseResponse(r io.Reader) (io.Reader, error) {
 	return output, nil
 }
 
-func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	artifacts, _ := prompt.GetArtifacts()
-	if len(artifacts) > 0 {
-		img, err := c.GenerateImage(prompt.GetQuestion(), len(artifacts))
-		if err != nil {
-			return nil, err
-		}
-		resp, err := http.DefaultClient.Get(img.Data[0].Url)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		for _, artifact := range artifacts {
-			_, err := artifact.Write(data)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				continue
-			}
-		}
-		return strings.NewReader("I drew you a picture!"), nil
+func (c *ChatGPT) CompletionSwitchboard(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	a, _ := prompt.GetArtifacts()
+	if len(a) > 0 {
+		return imageRequestPrompt(ctx, c.Token, prompt)
 	}
 	messages := MessageFromPrompt(prompt)
 	for _, message := range messages {
@@ -88,21 +90,5 @@ func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Rea
 			return c.visionCompletion(ctx, messages)
 		}
 	}
-	req, err := CreateChatGPTRequest(c.Token, c.Model, messages)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, NewClientError(resp)
-	}
-	defer resp.Body.Close()
-	answer, err := ParseResponse(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return answer, err
+	return standardCompletion(ctx, c.Token, prompt)
 }

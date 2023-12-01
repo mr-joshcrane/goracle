@@ -161,7 +161,7 @@ func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, err
 	if err != nil {
 		return nil, err
 	}
-	return c.standardCompletion(ctx, prompt)
+	return c.CompletionSwitchboard(ctx, prompt)
 }
 
 func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {

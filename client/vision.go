@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -55,7 +56,7 @@ type ImageResponse struct {
 	} `json:"data"`
 }
 
-func (c *ChatGPT) CreateImageRequest(prompt string, n int) (*http.Request, error) {
+func CreateImageRequest(token string, prompt string, n int) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ImageRequest{
 		Model:  DALLE3,
@@ -70,13 +71,13 @@ func (c *ChatGPT) CreateImageRequest(prompt string, n int) (*http.Request, error
 	if err != nil {
 		return nil, err
 	}
-	req = addDefaultHeaders(c.Token, req)
+	req = addDefaultHeaders(token, req)
 	return req, nil
 }
 
-func (c *ChatGPT) GenerateImage(prompt string, n int) (ImageResponse, error) {
+func GenerateImage(token string, prompt string, n int) (ImageResponse, error) {
 	var image ImageResponse
-	req, err := c.CreateImageRequest(prompt, n)
+	req, err := CreateImageRequest(prompt, token, n)
 	if err != nil {
 		return image, err
 	}
@@ -192,4 +193,29 @@ func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Re
 
 func isPNG(a []byte) bool {
 	return len(a) > 8 && bytes.Equal(a[:8], []byte("\x89PNG\x0d\x0a\x1a\x0a"))
+}
+
+func imageRequestPrompt(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
+	artifacts, _ := prompt.GetArtifacts()
+	img, err := GenerateImage(prompt.GetQuestion(), token, len(artifacts))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Get(img.Data[0].Url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	for _, artifact := range artifacts {
+		_, err := artifact.Write(data)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			continue
+		}
+	}
+	return strings.NewReader("I drew you a picture!"), nil
 }
