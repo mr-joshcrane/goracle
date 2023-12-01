@@ -14,35 +14,22 @@ import (
 	"github.com/mr-joshcrane/oracle"
 )
 
-func TestGiveExample(t *testing.T) {
+func TestOracleIntegration_ExamplesGuideOutput(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
-	buf := new(bytes.Buffer)
-	prompt := oracle.Prompt{
-		Purpose: "To answer if a number is odd or even in a specific format",
-		InputHistory: []string{
-			"2",
-			"3",
-		},
-		OutputHistory: []string{
-			"+++even+++",
-			"---odd---",
-		},
-		Question: "6",
-		Target:   buf,
-	}
-	err := o.Completion(context.TODO(), prompt)
+	o.GiveExample("2", "+++even+++")
+	o.GiveExample("3", "---odd---")
+	got, err := o.Ask(context.Background(), "6")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
 
-	got := buf.String()
 	if got != "+++even+++" {
 		t.Fatal(cmp.Diff("+++even+++", got))
 	}
 }
 
-func TestAsk(t *testing.T) {
+func TestOracleIntegration_PurposeGuidesOutput(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
 	o.SetPurpose("You always answer questions with the number 42.")
@@ -56,21 +43,21 @@ func TestAsk(t *testing.T) {
 	}
 }
 
-func TestCreateImageDescribeImage(t *testing.T) {
+func TestOracleIntegration_CreateAnImageThenDescribeIt(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
 	buf := new(bytes.Buffer)
-	err := o.CreateImage(context.Background(), "please create a simple black square, nothing else", buf)
+	artifact := oracle.NewArtifacts(buf)
+	_, err := o.Ask(context.TODO(), "please create a simple black square, nothing else", artifact)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	question := "What color and shape is this?"
 	image, _, err := image.Decode(buf)
 	if err != nil {
 		t.Errorf("Error decoding image: %s", err)
 	}
-	images := oracle.WithImages(image)
-	answer, err := o.DescribeImage(context.TODO(), question, images)
+	images := oracle.NewVisuals(image)
+	answer, err := o.Ask(context.TODO(), "What color and shape is this?", images)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -79,15 +66,15 @@ func TestCreateImageDescribeImage(t *testing.T) {
 	}
 }
 
-func TestCreateTranscriptFromAudio(t *testing.T) {
+func TestOracleIntegration_CreateSpeechThenTranscribeIt(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)
-	buf := new(bytes.Buffer)
-	err := o.CreateAudio(context.Background(), "Hello, world!", buf)
+	speech, err := o.TextToSpeech(context.TODO(), "Hello, world!")
 	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+		t.Errorf("error generating speech from text: %s", err)
 	}
-	answer, err := o.CreateTranscript(context.Background(), buf)
+
+	answer, err := o.SpeechToText(context.TODO(), speech)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}

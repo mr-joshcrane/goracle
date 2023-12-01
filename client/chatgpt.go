@@ -1,9 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 )
 
@@ -157,21 +159,14 @@ func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, err
 }
 
 func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
-	data, err := io.ReadAll(transform.GetSource())
-	if err != nil {
-		return err
+	source := transform.GetSource()
+	if _, ok := source.(*strings.Reader); ok {
+		return c.textToSpeech(ctx, transform)
 	}
-	for _, chunk := range chunkify(string(data), 4096) {
-		speech, err := GenerateSpeech(c.Token, chunk)
-		if err != nil {
-			return err
-		}
-		_, err = transform.GetTarget().Write(speech)
-		if err != nil {
-			return err
-		}
+	if _, ok := source.(*bytes.Buffer); ok {
+		return c.speechToText(ctx, transform)
 	}
-	return err
+	return fmt.Errorf("unknown transform source, %v", reflect.TypeOf(source).String())
 }
 
 func chunkify(data string, chunkSize int) []string {

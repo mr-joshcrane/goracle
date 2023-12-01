@@ -30,7 +30,7 @@ func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.
 	return o, c
 }
 
-func TestTextToSpeech(t *testing.T) {
+func TestTextToSpeechWithTrivialTransformerReturnsItsInput(t *testing.T) {
 	t.Parallel()
 	o, _ := createTestOracle("Hello World", nil)
 	r, err := o.TextToSpeech(ctx(), "Hello World")
@@ -47,7 +47,7 @@ func TestTextToSpeech(t *testing.T) {
 	}
 }
 
-func TestSpeechToText(t *testing.T) {
+func TestSpeechToTextWithTrivialTransformerReturnsItsInput(t *testing.T) {
 	t.Parallel()
 	o, _ := createTestOracle("", nil)
 	reader := bytes.NewReader([]byte("Hello World"))
@@ -60,7 +60,7 @@ func TestSpeechToText(t *testing.T) {
 	}
 }
 
-func TestAsk(t *testing.T) {
+func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("Hello World", nil)
 	got, err := o.Ask(ctx(), "Hello World")
@@ -79,7 +79,7 @@ func TestAsk(t *testing.T) {
 	}
 }
 
-func TestReset(t *testing.T) {
+func TestResetReturnsABlankOracle(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("Hello World", nil)
 	o.GiveExample("An example that should be forgotten", "And the ideal response that should be forgotten")
@@ -126,7 +126,7 @@ func TestPromptAccessorMethods(t *testing.T) {
 	}
 }
 
-func TestAsk_NewDocument(t *testing.T) {
+func TestAskWithNewDocumentProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	r := strings.NewReader("It's time to shine")
 	o, c := createTestOracle("", nil)
@@ -156,7 +156,7 @@ func TestAsk_NewDocument(t *testing.T) {
 	}
 }
 
-func TestAsk_NewDocuments(t *testing.T) {
+func TestAskWithNewDocumentsProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
 	r1 := strings.NewReader("It's time to shine")
@@ -198,7 +198,7 @@ func TestAsk_NewDocuments(t *testing.T) {
 	}
 }
 
-func TestAsk_NewVisuals(t *testing.T) {
+func TestAskWithNewVisualsProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
 	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
@@ -218,7 +218,7 @@ func TestAsk_NewVisuals(t *testing.T) {
 	}
 }
 
-func TestAsk_NewArtifact(t *testing.T) {
+func TestAskWithNewArtifactProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
 	buf := new(bytes.Buffer)
@@ -238,7 +238,7 @@ func TestAsk_NewArtifact(t *testing.T) {
 	}
 }
 
-func TestImageRef_Read(t *testing.T) {
+func TestImageRefCanBeRead(t *testing.T) {
 	t.Parallel()
 	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	page := oracle.ImagePage{
@@ -254,7 +254,7 @@ func TestImageRef_Read(t *testing.T) {
 	}
 }
 
-func TestAsk_NewArtifacts(t *testing.T) {
+func TestAskWithNewArtifactsCanProvideCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
 	buf1 := new(bytes.Buffer)
@@ -274,7 +274,7 @@ func TestAsk_NewArtifacts(t *testing.T) {
 	}
 }
 
-func TestPrompt_GetArtifacts(t *testing.T) {
+func TestPromptWithGetArtifactsProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	buf1 := bytes.NewBufferString("It's time to shine")
 	buf2 := bytes.NewBufferString("It's time to shine again")
@@ -303,7 +303,7 @@ func TestPrompt_GetArtifacts(t *testing.T) {
 	}
 }
 
-func TestPrompt_ErrorPaths(t *testing.T) {
+func TestPromptWithFaultyReferencesGivesErrorFeedback(t *testing.T) {
 	t.Parallel()
 	badReader := iotest.ErrReader(errors.New("Error reading page"))
 	badWriter, err := os.CreateTemp("", "oracle_test")

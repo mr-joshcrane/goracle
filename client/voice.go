@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +41,60 @@ func WithVoice(voice Voice) TTSReqOptions {
 		req.Voice = voice
 		return req
 	}
+}
+
+func (c *ChatGPT) textToSpeech(ctx context.Context, transform Transform) error {
+	text, err := io.ReadAll(transform.GetSource())
+	if err != nil {
+		return err
+	}
+	req, err := CreateTextToSpeechRequest(c.Token, string(text))
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("bad status code: %d, %s", resp.StatusCode, string(data))
+	}
+	target := transform.GetTarget()
+	_, err = io.Copy(target, resp.Body)
+	return err
+}
+
+func (c *ChatGPT) speechToText(ctx context.Context, transform Transform) error {
+	audio, err := io.ReadAll(transform.GetSource())
+	if err != nil {
+		return err
+	}
+
+	req, err := CreateSpeechToTextRequest(c.Token, audio)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("bad status code: %d, %s", resp.StatusCode, string(data))
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	_, err = transform.GetTarget().Write(data)
+	return err
 }
 
 func CreateTextToSpeechRequest(token string, text string, opts ...TTSReqOptions) (*http.Request, error) {
