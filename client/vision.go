@@ -18,29 +18,7 @@ const (
 	GPT4V  = "gpt-4-vision-preview"
 )
 
-func PNGToDataURI(data []byte) string {
-	base64Str := base64.StdEncoding.EncodeToString(data)
-	dataURI := "data:image/png;base64," + base64Str
-	return dataURI
-}
-
-func URLToURI(url url.URL) (string, error) {
-	visionMimeType := []string{
-		"image/png",
-		"image/jpeg",
-		"image/jpg",
-	}
-	resp, err := http.DefaultClient.Head(url.String())
-	if err != nil {
-		return "", err
-	}
-	for _, mimeType := range visionMimeType {
-		if resp.Header.Get("Content-Type") == mimeType {
-			return url.String(), nil
-		}
-	}
-	return "", fmt.Errorf("unsupported visual mime type: %s", resp.Header.Get("Content-Type"))
-}
+// Image Generation Capability
 
 type ImageRequest struct {
 	Model  string `json:"model"`
@@ -56,7 +34,41 @@ type ImageResponse struct {
 	} `json:"data"`
 }
 
-func CreateImageRequest(token string, prompt string, n int) (*http.Request, error) {
+func imageRequest(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
+	artifacts, err := prompt.GetArtifacts()
+	if err != nil {
+		return nil, err
+	}
+	if len(artifacts) < 1 {
+		return nil, fmt.Errorf("no artifacts found, and I need that to store my drawing")
+	}
+	req, err := CreateImageRequest(token, prompt.GetQuestion())
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	link, err := ParseCreateImageResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ParseLinkToImage(link)
+	if err != nil {
+		return nil, err
+	}
+	for _, artifact := range artifacts {
+		_, err := io.Copy(artifact, data)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			continue
+		}
+	}
+	return strings.NewReader("I drew you a picture!"), nil
+}
+
+func CreateImageRequest(token string, prompt string) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(ImageRequest{
 		Model:  DALLE3,
@@ -75,34 +87,42 @@ func CreateImageRequest(token string, prompt string, n int) (*http.Request, erro
 	return req, nil
 }
 
-func GenerateImage(token string, prompt string, n int) (ImageResponse, error) {
-	var image ImageResponse
-	req, err := CreateImageRequest(prompt, token, n)
-	if err != nil {
-		return image, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return image, err
-	}
+func ParseCreateImageResponse(resp *http.Response) (string, error) {
+	var imageResponse ImageResponse
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println(resp.Status)
-		return image, fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return image, err
+		return "", err
 	}
-	err = json.Unmarshal(data, &image)
+	err = json.Unmarshal(data, &imageResponse)
 	if err != nil {
-		return image, err
+		return "", err
 	}
-	if len(image.Data) < 1 {
-		return image, fmt.Errorf("no images returned")
+	if len(imageResponse.Data) < 1 {
+		return "", fmt.Errorf("no images returned")
 	}
-	return image, nil
+	imageUrl := imageResponse.Data[0].Url // Only one image supported by DALEE3 :\
+	return imageUrl, nil
 }
+
+func ParseLinkToImage(link string) (io.Reader, error) {
+	resp, err := http.DefaultClient.Get(link)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(data), nil
+}
+
+// Vision Capability
 
 type VisionImageURL struct {
 	Type     string `json:"type"`
@@ -125,6 +145,13 @@ type VisionRequest struct {
 	Messages  Messages `json:"messages"`
 	MaxTokens int      `json:"max_tokens"`
 }
+type VisionCompletionResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	}
+}
 
 func CreateVisionRequest(token string, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
@@ -144,26 +171,21 @@ func CreateVisionRequest(token string, messages Messages) (*http.Request, error)
 	return req, nil
 }
 
-type VisionCompletionResponse struct {
-	Id      string `json:"id"`
-	Object  string `json:"object"`
-	Created int    `json:"created"`
-	Model   string `json:"model"`
-	Usage   struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
-	Choices []struct {
-		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"message"`
-		FinishDetails struct {
-			Type string `json:"type"`
-		} `json:"finish_details"`
-		Index int `json:"index"`
-	} `json:"choices"`
+func ParseVisionRequest(resp *http.Response) (io.Reader, error) {
+	var completion VisionCompletionResponse
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewClientError(resp)
+	}
+	defer resp.Body.Close()
+	err := json.NewDecoder(resp.Body).Decode(&completion)
+	if err != nil {
+		return nil, err
+	}
+	if len(completion.Choices) < 1 {
+		return nil, fmt.Errorf("no choices returned")
+	}
+	answer := strings.NewReader(completion.Choices[0].Message.Content)
+	return answer, nil
 }
 
 func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Reader, error) {
@@ -175,47 +197,33 @@ func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Re
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, NewClientError(resp)
-	}
-	defer resp.Body.Close()
-	var completion VisionCompletionResponse
-	err = json.NewDecoder(resp.Body).Decode(&completion)
-	if err != nil {
-		return nil, err
-	}
-	if len(completion.Choices) < 1 {
-		return nil, fmt.Errorf("no choices returned")
-	}
-	answer := strings.NewReader(completion.Choices[0].Message.Content)
-	return answer, nil
+	return ParseVisionRequest(resp)
 }
 
 func isPNG(a []byte) bool {
 	return len(a) > 8 && bytes.Equal(a[:8], []byte("\x89PNG\x0d\x0a\x1a\x0a"))
 }
 
-func imageRequestPrompt(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
-	artifacts, _ := prompt.GetArtifacts()
-	img, err := GenerateImage(prompt.GetQuestion(), token, len(artifacts))
-	if err != nil {
-		return nil, err
+func PNGToDataURI(data []byte) string {
+	base64Str := base64.StdEncoding.EncodeToString(data)
+	dataURI := "data:image/png;base64," + base64Str
+	return dataURI
+}
+
+func URLToURI(url url.URL) (string, error) {
+	visionMimeType := []string{
+		"image/png",
+		"image/jpeg",
+		"image/jpg",
 	}
-	resp, err := http.DefaultClient.Get(img.Data[0].Url)
+	resp, err := http.DefaultClient.Head(url.String())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	for _, artifact := range artifacts {
-		_, err := artifact.Write(data)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			continue
+	for _, mimeType := range visionMimeType {
+		if resp.Header.Get("Content-Type") == mimeType {
+			return url.String(), nil
 		}
 	}
-	return strings.NewReader("I drew you a picture!"), nil
+	return "", fmt.Errorf("unsupported visual mime type: %s", resp.Header.Get("Content-Type"))
 }

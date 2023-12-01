@@ -15,20 +15,20 @@ const (
 	GPT4       = "gpt-4-1106-preview"
 )
 
-type ChatCompletionRequest struct {
+type TextCompletionRequest struct {
 	Model    string   `json:"model"`
 	Messages Messages `json:"messages"`
 }
 
-type ChatCompletionResponse struct {
+type TextCompletionResponse struct {
 	Choices []struct {
 		Message TextMessage `json:"message"`
 	} `json:"choices"`
 }
 
-func standardCompletion(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
+func textCompletion(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
 	messages := MessageFromPrompt(prompt)
-	req, err := CreateChatGPTRequest(token, GPT4, messages)
+	req, err := CreateTextCompletionRequest(token, GPT4, messages)
 
 	if err != nil {
 		return nil, err
@@ -41,17 +41,16 @@ func standardCompletion(ctx context.Context, token string, prompt Prompt) (io.Re
 		return nil, NewClientError(resp)
 	}
 	defer resp.Body.Close()
-	answer, err := ParseResponse(resp.Body)
+	answer, err := ParseTextCompletionReponse(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	return answer, err
-
 }
 
-func CreateChatGPTRequest(token string, model string, messages Messages) (*http.Request, error) {
+func CreateTextCompletionRequest(token string, model string, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
-	err := json.NewEncoder(buf).Encode(ChatCompletionRequest{
+	err := json.NewEncoder(buf).Encode(TextCompletionRequest{
 		Model:    model,
 		Messages: messages,
 	})
@@ -66,8 +65,8 @@ func CreateChatGPTRequest(token string, model string, messages Messages) (*http.
 	return req, nil
 }
 
-func ParseResponse(r io.Reader) (io.Reader, error) {
-	resp := ChatCompletionResponse{}
+func ParseTextCompletionReponse(r io.Reader) (io.Reader, error) {
+	resp := TextCompletionResponse{}
 	err := json.NewDecoder(r).Decode(&resp)
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func ParseResponse(r io.Reader) (io.Reader, error) {
 func (c *ChatGPT) CompletionSwitchboard(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	a, _ := prompt.GetArtifacts()
 	if len(a) > 0 {
-		return imageRequestPrompt(ctx, c.Token, prompt)
+		return imageRequest(ctx, c.Token, prompt)
 	}
 	messages := MessageFromPrompt(prompt)
 	for _, message := range messages {
@@ -90,5 +89,5 @@ func (c *ChatGPT) CompletionSwitchboard(ctx context.Context, prompt Prompt) (io.
 			return c.visionCompletion(ctx, messages)
 		}
 	}
-	return standardCompletion(ctx, c.Token, prompt)
+	return textCompletion(ctx, c.Token, prompt)
 }
