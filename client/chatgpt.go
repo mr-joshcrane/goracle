@@ -24,8 +24,8 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetPages() []io.Reader
-	GetArtifacts() []io.ReadWriter
+	GetPages() ([]io.Reader, error)
+	GetArtifacts() ([]io.ReadWriter, error)
 }
 
 type Transform interface {
@@ -69,7 +69,7 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
-	refs := prompt.GetPages()
+	refs, _ := prompt.GetPages()
 	for i, reference := range refs {
 		i++
 		contents, err := io.ReadAll(reference)
@@ -145,6 +145,14 @@ func NewChatGPT(token string) *ChatGPT {
 }
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	_, err := prompt.GetPages()
+	if err != nil {
+		return nil, err
+	}
+	_, err = prompt.GetArtifacts()
+	if err != nil {
+		return nil, err
+	}
 	return c.standardCompletion(ctx, prompt)
 }
 

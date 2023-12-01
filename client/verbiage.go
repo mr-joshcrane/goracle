@@ -69,7 +69,7 @@ type ModelResponse struct {
 }
 
 func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	artifacts := prompt.GetArtifacts()
+	artifacts, _ := prompt.GetArtifacts()
 	if len(artifacts) > 0 {
 		img, err := c.GenerateImage(prompt.GetQuestion(), len(artifacts))
 		if err != nil {

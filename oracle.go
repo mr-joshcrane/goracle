@@ -3,6 +3,7 @@ package oracle
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -51,32 +52,46 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-func (p Prompt) GetPages() []io.Reader {
+func (p Prompt) GetPages() ([]io.Reader, error) {
 	references := []io.Reader{}
+	errors := []error{}
 	for _, ref := range p.Pages {
 		page, ok := ref.(Page)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("error reading page")
 		}
 		data, err := page.GetContent()
 		if err != nil {
+			errors = append(errors, err)
 			continue
 		}
 		references = append(references, bytes.NewReader(data))
 	}
-	return references
+	if len(errors) > 0 {
+		return nil, fmt.Errorf("error reading pages: %v", errors)
+	}
+	return references, nil
 }
 
-func (p Prompt) GetArtifacts() []io.ReadWriter {
+func (p Prompt) GetArtifacts() ([]io.ReadWriter, error) {
 	artifacts := []io.ReadWriter{}
+	errors := []error{}
 	for _, artifact := range p.Artifacts {
 		artifact, ok := artifact.(Artifact)
 		if !ok {
+			return nil, fmt.Errorf("error reading artifact")
+		}
+		_, err := artifact.contents.Write([]byte{}) // write nothing to test if it's writable
+		if err != nil {
+			errors = append(errors, err)
 			continue
 		}
 		artifacts = append(artifacts, artifact.contents)
 	}
-	return artifacts
+	if len(errors) > 0 {
+		return nil, fmt.Errorf("error reading artifacts: %v", errors)
+	}
+	return artifacts, nil
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -134,8 +149,6 @@ func (o *Oracle) GeneratePrompt(question string, references ...References) Promp
 				pages = append(pages, reference)
 			case ReadWriteRef:
 				artifacts = append(artifacts, reference)
-			default:
-				continue
 			}
 		}
 	}

@@ -3,10 +3,13 @@ package oracle_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"io"
+	"os"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -140,8 +143,11 @@ func TestAsk_NewDocument(t *testing.T) {
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
 	}
-	data := c.P.GetPages()[0]
-	got, err := io.ReadAll(data)
+	data, err := c.P.GetPages()
+	if err != nil {
+		t.Errorf("Error getting pages: %s", err)
+	}
+	got, err := io.ReadAll(data[0])
 	if err != nil {
 		t.Errorf("Error reading reference: %s", err)
 	}
@@ -169,7 +175,7 @@ func TestAsk_NewDocuments(t *testing.T) {
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
 	}
-	refs := c.P.GetPages()
+	refs, _ := c.P.GetPages()
 	if len(refs) < 1 {
 		t.Fatal("Expected 1 reference, got 0")
 	}
@@ -277,7 +283,7 @@ func TestPrompt_GetArtifacts(t *testing.T) {
 		Question:  "Please create two artifacts",
 		Artifacts: oracle.NewArtifacts(buf1, buf2),
 	}
-	artifacts := prompt.GetArtifacts()
+	artifacts, _ := prompt.GetArtifacts()
 	if len(artifacts) != 2 {
 		t.Errorf("Expected 2 artifacts, got %d", len(artifacts))
 	}
@@ -294,5 +300,29 @@ func TestPrompt_GetArtifacts(t *testing.T) {
 	}
 	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
 		t.Errorf("Expected It's time to shine again, got %s", got)
+	}
+}
+
+func TestPrompt_ErrorPaths(t *testing.T) {
+	t.Parallel()
+	badReader := iotest.ErrReader(errors.New("Error reading page"))
+	badWriter, err := os.CreateTemp("", "oracle_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	badWriter.Close()
+	prompt := oracle.Prompt{
+		Purpose:   "You are a test Oracle",
+		Question:  "Please create two artifacts",
+		Pages:     oracle.NewDocuments(badReader),
+		Artifacts: oracle.NewArtifacts(badWriter),
+	}
+	_, err = prompt.GetArtifacts()
+	if err == nil {
+		t.Errorf("Expected error reading artifacts, got %v", err)
+	}
+	_, err = prompt.GetPages()
+	if err == nil {
+		t.Errorf("Expected error reading pages, got %v", err)
 	}
 }
