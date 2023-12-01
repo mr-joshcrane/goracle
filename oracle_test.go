@@ -14,7 +14,7 @@ import (
 	"github.com/mr-joshcrane/oracle/client"
 )
 
-var IgnoreReader = cmpopts.IgnoreUnexported(oracle.ArtifactRef{}, oracle.ImageRef{}, strings.Reader{}, bytes.Reader{}, oracle.DocumentRef{})
+var IgnoreReader = cmpopts.IgnoreUnexported(bytes.Buffer{}, oracle.Artifact{}, oracle.ImagePage{}, strings.Reader{}, bytes.Reader{}, oracle.DocumentPage{})
 
 func ctx() context.Context {
 	return context.TODO()
@@ -68,9 +68,8 @@ func TestAsk(t *testing.T) {
 		t.Errorf("Expected Hello World, got %s", got)
 	}
 	want := oracle.Prompt{
-		Purpose:    "You are a test Oracle",
-		Question:   "Hello World",
-		References: oracle.References{},
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
 	}
 	if !cmp.Equal(c.P, want) {
 		t.Fatal(cmp.Diff(want, c.P))
@@ -95,7 +94,6 @@ func TestReset(t *testing.T) {
 		InputHistory:  []string{},
 		OutputHistory: []string{},
 		Question:      "Hello World",
-		References:    oracle.References{},
 	}
 	if !cmp.Equal(c.P, want) {
 		t.Fatal(cmp.Diff(want, c.P))
@@ -135,14 +133,14 @@ func TestAsk_NewDocument(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:    "You are a test Oracle",
-		Question:   "Hello World",
-		References: document,
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
+		Pages:    document,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
 	}
-	data := c.P.GetReferences()[0]
+	data := c.P.GetPages()[0]
 	got, err := io.ReadAll(data)
 	if err != nil {
 		t.Errorf("Error reading reference: %s", err)
@@ -164,14 +162,14 @@ func TestAsk_NewDocuments(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:    "You are a test Oracle",
-		Question:   "Hello World",
-		References: documents,
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
+		Pages:    documents,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
 	}
-	refs := c.P.GetReferences()
+	refs := c.P.GetPages()
 	if len(refs) < 1 {
 		t.Fatal("Expected 1 reference, got 0")
 	}
@@ -205,9 +203,9 @@ func TestAsk_NewVisuals(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:    "You are a test Oracle",
-		Question:   "Hello World",
-		References: visuals,
+		Purpose:  "You are a test Oracle",
+		Question: "Hello World",
+		Pages:    visuals,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
@@ -225,9 +223,9 @@ func TestAsk_NewArtifact(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := oracle.Prompt{
-		Purpose:    "You are a test Oracle",
-		Question:   "Please create an artifact",
-		References: artifacts,
+		Purpose:   "You are a test Oracle",
+		Question:  "Please create an artifact",
+		Artifacts: artifacts,
 	}
 	if !cmp.Equal(c.P, want, IgnoreReader) {
 		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
@@ -237,12 +235,64 @@ func TestAsk_NewArtifact(t *testing.T) {
 func TestImageRef_Read(t *testing.T) {
 	t.Parallel()
 	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	visuals := oracle.NewVisuals(v)
-	got, err := visuals[0].GetContent()
+	page := oracle.ImagePage{
+		Image: v,
+	}
+
+	got, err := page.GetContent()
 	if err != nil {
 		t.Errorf("Error reading image: %s", err)
 	}
 	if len(got) != 298 {
 		t.Errorf("Expected 40000 bytes, got %d", len(got))
+	}
+}
+
+func TestAsk_NewArtifacts(t *testing.T) {
+	t.Parallel()
+	o, c := createTestOracle("", nil)
+	buf1 := new(bytes.Buffer)
+	buf2 := new(bytes.Buffer)
+	artifacts := oracle.NewArtifacts(buf1, buf2)
+	_, err := o.Ask(ctx(), "Please create two artifacts", artifacts)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	want := oracle.Prompt{
+		Purpose:   "You are a test Oracle",
+		Question:  "Please create two artifacts",
+		Artifacts: artifacts,
+	}
+	if !cmp.Equal(c.P, want, IgnoreReader) {
+		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	}
+}
+
+func TestPrompt_GetArtifacts(t *testing.T) {
+	t.Parallel()
+	buf1 := bytes.NewBufferString("It's time to shine")
+	buf2 := bytes.NewBufferString("It's time to shine again")
+	prompt := oracle.Prompt{
+		Purpose:   "You are a test Oracle",
+		Question:  "Please create two artifacts",
+		Artifacts: oracle.NewArtifacts(buf1, buf2),
+	}
+	artifacts := prompt.GetArtifacts()
+	if len(artifacts) != 2 {
+		t.Errorf("Expected 2 artifacts, got %d", len(artifacts))
+	}
+	got, err := io.ReadAll(artifacts[0])
+	if err != nil {
+		t.Errorf("Error reading artifact: %s", err)
+	}
+	if !cmp.Equal(got, []byte("It's time to shine"), IgnoreReader) {
+		t.Errorf("Expected It's time to shine, got %s", got)
+	}
+	got, err = io.ReadAll(artifacts[1])
+	if err != nil {
+		t.Errorf("Error reading artifact: %s", err)
+	}
+	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
+		t.Errorf("Expected It's time to shine again, got %s", got)
 	}
 }

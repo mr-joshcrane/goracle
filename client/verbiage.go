@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -68,29 +69,29 @@ type ModelResponse struct {
 }
 
 func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	artifacts := []io.ReadWriter{}
-	reference := prompt.GetReferences()
-	for _, reference := range reference {
-		_, ok := reference.(io.Writer)
-		if ok {
-			artifacts = append(artifacts, Artifact{Contents: reference.(io.ReadWriter)})
-		}
-	}
+	artifacts := prompt.GetArtifacts()
 	if len(artifacts) > 0 {
 		img, err := c.GenerateImage(prompt.GetQuestion(), len(artifacts))
 		if err != nil {
 			return nil, err
 		}
-		links := make([]string, len(img.Data))
-		for i, link := range img.Data {
-			_, err := artifacts[i].Write([]byte(link.Url))
-			if err != nil {
-				return nil, err
-			}
-			links[i] = link.Url
+		resp, err := http.DefaultClient.Get(img.Data[0].Url)
+		if err != nil {
+			return nil, err
 		}
-		l := strings.Join(links, "\n")
-		return strings.NewReader(l), nil
+		defer resp.Body.Close()
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		for _, artifact := range artifacts {
+			_, err := artifact.Write(data)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				continue
+			}
+		}
+		return strings.NewReader("I drew you a picture!"), nil
 	}
 	messages := MessageFromPrompt(prompt)
 	for _, message := range messages {

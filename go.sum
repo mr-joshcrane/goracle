@@ -1,2 +1,8 @@
-github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
-github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/cixtor/readability v1.0.0 h1:6YZo0JJsxt4Xor9lYpln3eSJeuQGukxIBois9wpQI6g=
+github.com/cixtor/readability v1.0.0/go.mod h1:WDrZcthrR2RVDxfMu3q0q59UKhReo5mIZAM6w1+MgFo=
+github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
+github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/mr-joshcrane/tldr v0.0.0-20231130223242-b98635b8f5bb h1:/2tbnoHS2kY5A3PrpagAGQjSys6D9UyxrVsxgJFva5A=
+github.com/mr-joshcrane/tldr v0.0.0-20231130223242-b98635b8f5bb/go.mod h1:A9WY1hFjy9t2QWW3UrScGVLk5ia7asG/M3f5GdnIPO4=
+golang.org/x/net v0.19.0 h1:zTwKpTd2XuCqf8huc7Fo2iSy+4RHPd10s4KzeTnVr1c=
+golang.org/x/net v0.19.0/go.mod h1:CfAk/cbD4CthTvqiEl8NpboMuiuOYsAr/7NOjZJtv1U=

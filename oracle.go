@@ -17,7 +17,8 @@ type Prompt struct {
 	Purpose       string
 	InputHistory  []string
 	OutputHistory []string
-	References    References
+	Pages         References
+	Artifacts     References
 	Question      string
 }
 
@@ -50,16 +51,32 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-func (p Prompt) GetReferences() []io.Reader {
+func (p Prompt) GetPages() []io.Reader {
 	references := []io.Reader{}
-	for _, ref := range p.References {
-		data, err := ref.GetContent()
+	for _, ref := range p.Pages {
+		page, ok := ref.(Page)
+		if !ok {
+			continue
+		}
+		data, err := page.GetContent()
 		if err != nil {
 			continue
 		}
 		references = append(references, bytes.NewReader(data))
 	}
 	return references
+}
+
+func (p Prompt) GetArtifacts() []io.ReadWriter {
+	artifacts := []io.ReadWriter{}
+	for _, artifact := range p.Artifacts {
+		artifact, ok := artifact.(Artifact)
+		if !ok {
+			continue
+		}
+		artifacts = append(artifacts, artifact.contents)
+	}
+	return artifacts
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -107,16 +124,28 @@ func NewOracle(token string, opts ...Option) *Oracle {
 // GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
 // question the current question posed by the user.
 func (o *Oracle) GeneratePrompt(question string, references ...References) Prompt {
-	refs := References{}
-	for _, r := range references {
-		refs = append(refs, r...)
+	var pages References
+	var artifacts References
+	for _, refSet := range references {
+		for _, reference := range refSet {
+			t := reference.Describe()
+			switch t {
+			case ReadOnlyRef:
+				pages = append(pages, reference)
+			case ReadWriteRef:
+				artifacts = append(artifacts, reference)
+			default:
+				continue
+			}
+		}
 	}
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
 		OutputHistory: o.previousOutputs,
 		Question:      question,
-		References:    refs,
+		Pages:         pages,
+		Artifacts:     artifacts,
 	}
 	return p
 }
@@ -133,27 +162,50 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.previousOutputs = append(o.previousOutputs, idealCompletion)
 }
 
+const (
+	ReadOnlyRef  = "Page"
+	ReadWriteRef = "Artifact"
+)
+
 type Reference interface {
-	GetContent() ([]byte, error)
+	Describe() string
 }
 
 type References []Reference
 
-type DocumentRef struct {
+type Page interface {
+	GetContent() ([]byte, error)
+}
+
+type DocumentPage struct {
 	contents io.Reader
 }
 
-type ImageRef struct {
-	image image.Image
+func (d DocumentPage) Describe() string {
+	return ReadOnlyRef
 }
 
-type ArtifactRef struct {
+type ImagePage struct {
+	Image image.Image
+}
+
+func (i ImagePage) Describe() string {
+	return ReadOnlyRef
+}
+
+type Artifacts []Artifact
+
+type Artifact struct {
 	contents io.ReadWriter
 }
 
-func (i *ImageRef) GetContent() ([]byte, error) {
+func (a Artifact) Describe() string {
+	return ReadWriteRef
+}
+
+func (i *ImagePage) GetContent() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := png.Encode(buf, i.image)
+	err := png.Encode(buf, i.Image)
 	if err != nil {
 		return nil, err
 	}
@@ -161,14 +213,14 @@ func (i *ImageRef) GetContent() ([]byte, error) {
 }
 
 func NewVisuals(image image.Image, images ...image.Image) References {
-	refs := []Reference{&ImageRef{image: image}}
+	refs := []Reference{&ImagePage{Image: image}}
 	for _, image := range images {
-		refs = append(refs, &ImageRef{image: image})
+		refs = append(refs, &ImagePage{Image: image})
 	}
 	return refs
 }
 
-func (i DocumentRef) GetContent() ([]byte, error) {
+func (i DocumentPage) GetContent() ([]byte, error) {
 	data, err := io.ReadAll(i.contents)
 	if err != nil {
 		return nil, err
@@ -177,28 +229,24 @@ func (i DocumentRef) GetContent() ([]byte, error) {
 }
 
 func NewDocuments(r io.Reader, a ...io.Reader) References {
-	refs := []Reference{DocumentRef{r}}
+	refs := []Reference{DocumentPage{r}}
 	for _, doc := range a {
-		refs = append(refs, DocumentRef{doc})
+		refs = append(refs, DocumentPage{doc})
 	}
 	return refs
 }
 
 func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
 	references := References{}
-	references = append(references, ArtifactRef{artifact})
+	references = append(references, Artifact{
+		contents: artifact,
+	})
 	for _, artifact := range a {
-		references = append(references, ArtifactRef{artifact})
+		references = append(references, Artifact{
+			contents: artifact,
+		})
 	}
 	return references
-}
-
-func (a ArtifactRef) GetContent() ([]byte, error) {
-	data, err := io.ReadAll(a.contents)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying

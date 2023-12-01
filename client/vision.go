@@ -73,7 +73,7 @@ func (c *ChatGPT) CreateImageRequest(prompt string, n int) (*http.Request, error
 	err := json.NewEncoder(buf).Encode(ImageRequest{
 		Model:  DALLE3,
 		Prompt: prompt,
-		N:      n,
+		N:      1, // Only one is supported by DALLE3 :\
 		Size:   "1024x1024",
 	})
 	if err != nil {

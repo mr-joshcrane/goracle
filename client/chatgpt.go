@@ -24,7 +24,8 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetReferences() []io.Reader
+	GetPages() []io.Reader
+	GetArtifacts() []io.ReadWriter
 }
 
 type Transform interface {
@@ -45,47 +46,6 @@ type TextMessage struct {
 
 func (t TextMessage) GetFormat() string {
 	return MessageText
-}
-
-func References(p Prompt) (refs []ReadReference) {
-	for _, reference := range p.GetReferences() {
-		_, ok := reference.(WriteReference)
-		if ok {
-			continue
-		}
-		r, ok := reference.(ReadReference)
-		if ok {
-			refs = append(refs, r)
-		}
-	}
-	return refs
-}
-
-func Artifacts(p Prompt) (artifacts []WriteReference) {
-	for _, reference := range p.GetReferences() {
-		_, ok := reference.(WriteReference)
-		if ok {
-			artifacts = append(artifacts, reference.(WriteReference))
-		}
-	}
-	return artifacts
-}
-
-type ReadReference struct {
-	Contents io.Reader
-}
-
-func (r ReadReference) Read(v []byte) (int, error) {
-	return r.Contents.Read(v)
-}
-
-type WriteReference struct {
-	Contents io.Reader
-	target   io.ReadWriter
-}
-
-func (w WriteReference) Read(v []byte) (int, error) {
-	return w.Contents.Read(v)
 }
 
 func MessageFromPrompt(prompt Prompt) Messages {
@@ -109,7 +69,7 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
-	refs := prompt.GetReferences()
+	refs := prompt.GetPages()
 	for i, reference := range refs {
 		i++
 		contents, err := io.ReadAll(reference)
@@ -188,14 +148,32 @@ func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, err
 	return c.standardCompletion(ctx, prompt)
 }
 
-func (c *ChatGPT) audioCompletion(ctx context.Context, prompt Prompt) error {
-	_, err := GenerateSpeech(c.Token, prompt.GetQuestion())
+func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
+	data, err := io.ReadAll(transform.GetSource())
 	if err != nil {
 		return err
+	}
+	for _, chunk := range chunkify(string(data), 4096) {
+		speech, err := GenerateSpeech(c.Token, chunk)
+		if err != nil {
+			return err
+		}
+		_, err = transform.GetTarget().Write(speech)
+		if err != nil {
+			return err
+		}
 	}
 	return err
 }
 
-func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
-	return nil
+func chunkify(data string, chunkSize int) []string {
+	var chunks []string
+	for i := 0; i < len(data); i += chunkSize {
+		end := i + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		chunks = append(chunks, data[i:end])
+	}
+	return chunks
 }
