@@ -1,3 +1,5 @@
+//go:build unit
+
 package client_test
 
 import (

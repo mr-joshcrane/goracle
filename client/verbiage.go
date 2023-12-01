@@ -40,11 +40,10 @@ func CreateChatGPTRequest(token string, model string, messages Messages) (*http.
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
+	req = addDefaultHeaders(token, req)
 	return req, nil
 }
+
 func ParseResponse(r io.Reader) (io.Reader, error) {
 	resp := ChatCompletionResponse{}
 	err := json.NewDecoder(r).Decode(&resp)
@@ -56,16 +55,6 @@ func ParseResponse(r io.Reader) (io.Reader, error) {
 	}
 	output := strings.NewReader(resp.Choices[0].Message.Content)
 	return output, nil
-}
-
-type ModelResponse struct {
-	Object string `json:"object"`
-	Data   []struct {
-		Id      string `json:"id"`
-		Object  string `json:"object"`
-		Created int    `json:"created"`
-		OwnedBy string `json:"owned_by"`
-	} `json:"data"`
 }
 
 func (c *ChatGPT) standardCompletion(ctx context.Context, prompt Prompt) (io.Reader, error) {

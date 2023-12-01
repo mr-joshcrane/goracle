@@ -115,29 +115,8 @@ func CreateTextToSpeechRequest(token string, text string, opts ...TTSReqOptions)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
+	req = addDefaultHeaders(token, req)
 	return req, nil
-}
-
-func GenerateSpeech(token, text string, opts ...TTSReqOptions) ([]byte, error) {
-	req, err := CreateTextToSpeechRequest(token, text, opts...)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 func CreateSpeechToTextRequest(token string, audio []byte) (*http.Request, error) {
@@ -165,33 +144,7 @@ func CreateSpeechToTextRequest(token string, audio []byte) (*http.Request, error
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req = addDefaultHeaders(token, req)
 	req.Header.Set("Content-Type", "multipart/form-data; boundary="+writer.Boundary())
 	return req, nil
-}
-
-func SpeechToText(token string, audio []byte) (string, error) {
-	req, err := CreateSpeechToTextRequest(token, audio)
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	var respBody struct {
-		Text string `json:"text"`
-	}
-	err = json.Unmarshal(data, &respBody)
-	if err != nil {
-		return "", err
-	}
-	return respBody.Text, nil
 }

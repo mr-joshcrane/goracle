@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"image"
-	"image/png"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,17 +16,6 @@ const (
 	DALLE3 = "dall-e-3"
 	GPT4V  = "gpt-4-vision-preview"
 )
-
-func ImageToDataURI(img image.Image) (string, error) {
-	var buf bytes.Buffer
-	err := png.Encode(&buf, img)
-	if err != nil {
-		return "", err
-	}
-	base64Str := base64.StdEncoding.EncodeToString(buf.Bytes())
-	dataURI := "data:image/png;base64," + base64Str
-	return dataURI, nil
-}
 
 func PNGToDataURI(data []byte) string {
 	base64Str := base64.StdEncoding.EncodeToString(data)
@@ -83,9 +70,7 @@ func (c *ChatGPT) CreateImageRequest(prompt string, n int) (*http.Request, error
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Content-Type", "application/json")
-
+	req = addDefaultHeaders(c.Token, req)
 	return req, nil
 }
 
@@ -154,9 +139,7 @@ func CreateVisionRequest(token string, messages Messages) (*http.Request, error)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
+	req = addDefaultHeaders(token, req)
 	return req, nil
 }
 
@@ -180,25 +163,6 @@ type VisionCompletionResponse struct {
 		} `json:"finish_details"`
 		Index int `json:"index"`
 	} `json:"choices"`
-}
-
-func CreateVisionMessage(prompt string, images ...string) VisionMessage {
-	messages := VisionMessage{
-		Role: RoleUser,
-		Content: []map[string]string{
-			{
-				"type": "text",
-				"text": prompt,
-			},
-		},
-	}
-	for _, imageSrc := range images {
-		messages.Content = append(messages.Content, map[string]string{
-			"type":      "image_url",
-			"image_url": imageSrc,
-		})
-	}
-	return messages
 }
 
 func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Reader, error) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"strings"
 )
@@ -139,6 +140,11 @@ type ChatGPT struct {
 	Model string
 }
 
+func addDefaultHeaders(token string, r *http.Request) *http.Request {
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+token)
+	return r
+}
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
