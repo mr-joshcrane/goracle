@@ -26,10 +26,8 @@ type TextCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func textCompletion(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
-	messages := MessageFromPrompt(prompt)
+func textCompletion(ctx context.Context, token string, messages Messages) (io.Reader, error) {
 	req, err := CreateTextCompletionRequest(token, GPT4, messages)
-
 	if err != nil {
 		return nil, err
 	}
@@ -76,18 +74,4 @@ func ParseTextCompletionReponse(r io.Reader) (io.Reader, error) {
 	}
 	output := strings.NewReader(resp.Choices[0].Message.Content)
 	return output, nil
-}
-
-func (c *ChatGPT) CompletionSwitchboard(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	a, _ := prompt.GetArtifacts()
-	if len(a) > 0 {
-		return imageRequest(ctx, c.Token, prompt)
-	}
-	messages := MessageFromPrompt(prompt)
-	for _, message := range messages {
-		if message.GetFormat() == MessageImage {
-			return c.visionCompletion(ctx, messages)
-		}
-	}
-	return textCompletion(ctx, c.Token, prompt)
 }

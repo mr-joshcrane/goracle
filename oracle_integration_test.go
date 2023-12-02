@@ -7,6 +7,7 @@ import (
 	"context"
 	"image"
 	"os"
+
 	"strings"
 	"testing"
 
@@ -41,6 +42,39 @@ func TestOracleIntegration_PurposeGuidesOutput(t *testing.T) {
 	if !strings.Contains(answer, "42") {
 		t.Errorf("Expected 42, got %s", answer)
 	}
+}
+
+func TestOracleIntegration_RefersToDocuments(t *testing.T) {
+	t.Parallel()
+	o := newTestOracle(t)
+	f, err := os.CreateTemp(t.TempDir(), "testfile.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.WriteString("cheese is made from milk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	fact1 := strings.NewReader("The sky is blue.")
+	fact2, err := os.Open(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	documents := oracle.NewDocuments(fact1, fact2)
+	answer, err := o.Ask(context.TODO(), "Can you repeat my two facts?", documents)
+	if err != nil {
+		t.Errorf("Error asking question: %s", err)
+	}
+	answer = strings.ToLower(answer)
+	if !strings.Contains(answer, "the sky is blue") {
+		t.Errorf("Error reading from buffer, expected the sky is blue, got %s", answer)
+	}
+	if !strings.Contains(answer, "cheese is made from milk") {
+		t.Errorf("Error reading from file, expected cheese is made from milk, got %s", answer)
+	}
+
 }
 
 func TestOracleIntegration_CreateAnImageThenDescribeIt(t *testing.T) {

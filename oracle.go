@@ -55,8 +55,8 @@ func (p Prompt) GetQuestion() string {
 func (p Prompt) GetPages() ([]io.Reader, error) {
 	references := []io.Reader{}
 	errors := []error{}
-	for _, ref := range p.Pages {
-		page, ok := ref.(Page)
+	for i := range p.Pages {
+		page, ok := p.Pages[i].(Page)
 		if !ok {
 			return nil, fmt.Errorf("error reading page")
 		}
@@ -194,14 +194,6 @@ type Page interface {
 	GetContent() ([]byte, error)
 }
 
-type DocumentPage struct {
-	contents io.Reader
-}
-
-func (d DocumentPage) Describe() string {
-	return ReadOnlyRef
-}
-
 type ImagePage struct {
 	Image image.Image
 }
@@ -237,6 +229,13 @@ func NewVisuals(image image.Image, images ...image.Image) References {
 	return refs
 }
 
+type DocumentPage struct {
+	contents io.Reader
+}
+
+func (d DocumentPage) Describe() string {
+	return ReadOnlyRef
+}
 func (i DocumentPage) GetContent() ([]byte, error) {
 	data, err := io.ReadAll(i.contents)
 	if err != nil {
@@ -246,9 +245,14 @@ func (i DocumentPage) GetContent() ([]byte, error) {
 }
 
 func NewDocuments(r io.Reader, a ...io.Reader) References {
-	refs := []Reference{DocumentPage{r}}
+	refs := []Reference{}
+	a = append(a, r)
 	for _, doc := range a {
-		refs = append(refs, DocumentPage{doc})
+		d, ok := doc.(io.Seeker)
+		if ok {
+			_, _ = d.Seek(0, io.SeekStart)
+		}
+		refs = append(refs, DocumentPage{contents: doc})
 	}
 	return refs
 }

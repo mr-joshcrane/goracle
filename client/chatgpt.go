@@ -87,6 +87,9 @@ func MessageFromPrompt(prompt Prompt) Messages {
 			})
 			continue
 		}
+		if contents == nil {
+			contents = []byte(fmt.Sprintf("Reference %d: %s", i, reference))
+		}
 		messages = append(messages, TextMessage{
 			Role:    RoleUser,
 			Content: fmt.Sprintf("Reference %d: %s", i, contents),
@@ -123,6 +126,14 @@ func NewDummyClient(FixedResponse string, err error) *Dummy {
 }
 
 func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	_, err := prompt.GetPages()
+	if err != nil {
+		return nil, err
+	}
+	_, err = prompt.GetArtifacts()
+	if err != nil {
+		return nil, err
+	}
 	d.P = prompt
 	return strings.NewReader(d.FixedResponse), d.Failure
 }
@@ -153,15 +164,20 @@ func NewChatGPT(token string) *ChatGPT {
 }
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	_, err := prompt.GetPages()
+	messages := MessageFromPrompt(prompt)
+	artifacts, err := prompt.GetArtifacts()
 	if err != nil {
 		return nil, err
 	}
-	_, err = prompt.GetArtifacts()
-	if err != nil {
-		return nil, err
+	if len(artifacts) > 0 {
+		return imageRequest(ctx, c.Token, prompt)
 	}
-	return c.CompletionSwitchboard(ctx, prompt)
+	for _, message := range messages {
+		if message.GetFormat() == MessageImage {
+			return c.visionCompletion(ctx, messages)
+		}
+	}
+	return textCompletion(ctx, c.Token, messages)
 }
 
 func (c *ChatGPT) Transform(ctx context.Context, transform Transform) error {
