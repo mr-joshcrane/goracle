@@ -141,17 +141,6 @@ func NewOracle(token string, opts ...Option) *Oracle {
 func (o *Oracle) GeneratePrompt(question string, references ...References) Prompt {
 	var pages References
 	var artifacts References
-	for _, refSet := range references {
-		for _, reference := range refSet {
-			t := reference.Describe()
-			switch t {
-			case ReadOnlyRef:
-				pages = append(pages, reference)
-			case ReadWriteRef:
-				artifacts = append(artifacts, reference)
-			}
-		}
-	}
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
@@ -160,6 +149,10 @@ func (o *Oracle) GeneratePrompt(question string, references ...References) Promp
 		Pages:         pages,
 		Artifacts:     artifacts,
 	}
+	for _, reference := range references {
+		reference.AddTo(&p)
+	}
+
 	return p
 }
 
@@ -185,6 +178,17 @@ type Reference interface {
 }
 
 type References []Reference
+
+func (r References) AddTo(p *Prompt) {
+	for _, ref := range r {
+		switch ref.Describe() {
+		case ReadOnlyRef:
+			p.Pages = append(p.Pages, ref)
+		case ReadWriteRef:
+			p.Artifacts = append(p.Artifacts, ref)
+		}
+	}
+}
 
 type Page interface {
 	GetContent() ([]byte, error)

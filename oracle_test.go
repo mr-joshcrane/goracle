@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
+	"image/png"
 	"io"
 	"os"
 	"strings"
@@ -12,12 +14,23 @@ import (
 	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/mr-joshcrane/oracle"
 	"github.com/mr-joshcrane/oracle/client"
 )
 
-var IgnoreReader = cmpopts.IgnoreUnexported(bytes.Buffer{}, oracle.Artifact{}, oracle.ImagePage{}, strings.Reader{}, bytes.Reader{}, oracle.DocumentPage{})
+func compareReaders(t *testing.T, x, y io.Reader) {
+	xBytes, err := io.ReadAll(x)
+	if err != nil {
+		t.Fatalf("Error reading reference X: %s", err)
+	}
+	yBytes, err := io.ReadAll(y)
+	if err != nil {
+		t.Fatalf("Error reading reference Y: %s", err)
+	}
+	if !bytes.Equal(xBytes, yBytes) {
+		t.Fatalf("Expected %s, got %s", string(xBytes), string(yBytes))
+	}
+}
 
 func ctx() context.Context {
 	return context.TODO()
@@ -135,25 +148,14 @@ func TestAskWithNewDocumentProvidesCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
-		Purpose:  "You are a test Oracle",
-		Question: "Hello World",
-		Pages:    document,
-	}
-	if !cmp.Equal(c.P, want, IgnoreReader) {
-		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
-	}
-	data, err := c.P.GetPages()
+	readers, err := c.P.GetPages()
 	if err != nil {
 		t.Errorf("Error getting pages: %s", err)
 	}
-	got, err := io.ReadAll(data[0])
-	if err != nil {
-		t.Errorf("Error reading reference: %s", err)
+	if len(readers) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(readers))
 	}
-	if !cmp.Equal(got, []byte("It's time to shine")) {
-		t.Errorf("Expected It's time to shine, got %s", got)
-	}
+	compareReaders(t, readers[0], r)
 }
 
 func TestAskWithNewDocumentsProvidesCorrectPrompt(t *testing.T) {
@@ -167,35 +169,14 @@ func TestAskWithNewDocumentsProvidesCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
-		Purpose:  "You are a test Oracle",
-		Question: "Hello World",
-		Pages:    documents,
-	}
-	if !cmp.Equal(c.P, want, IgnoreReader) {
-		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
-	}
-	refs, _ := c.P.GetPages()
-	if len(refs) < 1 {
-		t.Fatal("Expected 1 reference, got 0")
-	}
-	got, err := io.ReadAll(refs[0])
+	readers, err := c.P.GetPages()
 	if err != nil {
-		t.Errorf("Error reading reference: %s", err)
+		t.Errorf("Error getting pages: %s", err)
 	}
-	if !cmp.Equal(got, []byte("It's time to shine"), IgnoreReader) {
-		t.Errorf("Expected It's time to shine, got %s", got)
+	if len(readers) != 2 {
+		t.Errorf("Expected 2 references, got %d", len(readers))
 	}
-	if len(refs) < 2 {
-		t.Fatal("Expected 2 references, got 1")
-	}
-	got, err = io.ReadAll(refs[1])
-	if err != nil {
-		t.Errorf("Error reading reference: %s", err)
-	}
-	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
-		t.Errorf("Expected It's time to shine again, got %s", got)
-	}
+	compareReaders(t, readers[0], r1)
 }
 
 func TestAskWithNewVisualsProvidesCorrectPrompt(t *testing.T) {
@@ -208,33 +189,45 @@ func TestAskWithNewVisualsProvidesCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
-		Purpose:  "You are a test Oracle",
-		Question: "Hello World",
-		Pages:    visuals,
+	readers, err := c.P.GetPages()
+	if err != nil {
+		t.Errorf("Error getting pages: %s", err)
 	}
-	if !cmp.Equal(c.P, want, IgnoreReader) {
-		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	if len(readers) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(readers))
 	}
+	var want bytes.Buffer
+	err = png.Encode(&want, v)
+	if err != nil {
+		t.Errorf("Error encoding image: %s", err)
+	}
+	got := readers[0]
+	compareReaders(t, got, &want)
 }
 
 func TestAskWithNewArtifactProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	buf := new(bytes.Buffer)
-	artifacts := oracle.NewArtifacts(buf)
+	want := new(bytes.Buffer)
+	artifacts := oracle.NewArtifacts(want)
 
 	_, err := o.Ask(ctx(), "Please create an artifact", artifacts)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
-		Purpose:   "You are a test Oracle",
-		Question:  "Please create an artifact",
-		Artifacts: artifacts,
+	art, err := c.P.GetArtifacts()
+	if err != nil {
+		t.Errorf("Error getting artifacts: %s", err)
 	}
-	if !cmp.Equal(c.P, want, IgnoreReader) {
-		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	if len(art) != 1 {
+		t.Errorf("Expected 1 artifact, got %d", len(artifacts))
+	}
+	got := art[0]
+	if got == nil {
+		t.Fatal("Expected artifact, got nil")
+	}
+	if got != want {
+		t.Fatalf("Artifact pointers do not match")
 	}
 }
 
@@ -264,13 +257,18 @@ func TestAskWithNewArtifactsCanProvideCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
-		Purpose:   "You are a test Oracle",
-		Question:  "Please create two artifacts",
-		Artifacts: artifacts,
+	art, err := c.P.GetArtifacts()
+	if err != nil {
+		t.Errorf("Error getting artifacts: %s", err)
 	}
-	if !cmp.Equal(c.P, want, IgnoreReader) {
-		t.Fatal(cmp.Diff(want, c.P, IgnoreReader))
+	if len(art) != 2 {
+		t.Errorf("Expected 2 artifacts, got %d", len(art))
+	}
+	if art[0] != buf1 {
+		t.Errorf("Expected artifact 1 to be buf1")
+	}
+	if art[1] != buf2 {
+		t.Errorf("Expected artifact 2 to be buf2")
 	}
 }
 
@@ -287,19 +285,11 @@ func TestPromptWithGetArtifactsProvidesCorrectPrompt(t *testing.T) {
 	if len(artifacts) != 2 {
 		t.Errorf("Expected 2 artifacts, got %d", len(artifacts))
 	}
-	got, err := io.ReadAll(artifacts[0])
-	if err != nil {
-		t.Errorf("Error reading artifact: %s", err)
+	if artifacts[0] != buf1 {
+		t.Errorf("Expected artifact 1 to be buf1")
 	}
-	if !cmp.Equal(got, []byte("It's time to shine"), IgnoreReader) {
-		t.Errorf("Expected It's time to shine, got %s", got)
-	}
-	got, err = io.ReadAll(artifacts[1])
-	if err != nil {
-		t.Errorf("Error reading artifact: %s", err)
-	}
-	if !cmp.Equal(got, []byte("It's time to shine again"), IgnoreReader) {
-		t.Errorf("Expected It's time to shine again, got %s", got)
+	if artifacts[1] != buf2 {
+		t.Errorf("Expected artifact 2 to be buf2")
 	}
 }
 
@@ -325,4 +315,114 @@ func TestPromptWithFaultyReferencesGivesErrorFeedback(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error reading pages, got %v", err)
 	}
+}
+
+// Examples
+
+func ExampleOracle_Ask_standardTextCompletion() {
+	// Basic request response text flow
+	c := client.NewDummyClient("A friendly LLM response!", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+	answer, err := o.Ask(ctx, "A user question")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: A friendly LLM response!
+}
+
+func ExampleOracle_Ask_visualsToText() {
+	// Text request with reference to an [image.Image]
+	c := client.NewDummyClient("This is a black square!", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+
+	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	visuals := oracle.NewVisuals(v)
+	answer, err := o.Ask(ctx, "What color and shape is this image?", visuals)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: This is a black square!
+}
+
+func ExampleOracle_Ask_textToImage() {
+	// Request an image based on a text prompt
+	// Requires an [Artifact] to write the image to
+	c := client.NewDummyClient("I drew you an image!", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+
+	buf := new(bytes.Buffer)
+	artifacts := oracle.NewArtifacts(buf)
+	answer, err := o.Ask(ctx, "Please create a simple red square on a black background, nothing else", artifacts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: I drew you an image!
+}
+
+func ExampleOracle_Transform_textToSpeech() {
+	// Transform text to audio
+	// Requires a [strings.Reader] as the source
+	// Returns an [io.Reader] as the target
+	c := client.NewDummyClient("", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+
+	speech, err := o.TextToSpeech(ctx, "Hello, world!")
+	if err != nil {
+		panic(err)
+	}
+	data, err := io.ReadAll(speech)
+	if err != nil {
+		panic(err)
+	}
+	_ = os.WriteFile("hello_world.wav", data, 0644)
+}
+
+func ExampleOracle_Transform_speechToText() {
+	// Transform audio to text
+	// Requires an [io.Reader] as the source
+	// Returns a [string] as the target
+	c := client.NewDummyClient("A transcript of your audio data", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+
+	// In reality, this will be some reader containing audio data
+	r := bytes.NewReader([]byte(c.FixedResponse))
+	answer, err := o.SpeechToText(ctx, r)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: A transcript of your audio data
+}
+
+func ExampleOracle_Ask_chainCalls() {
+	// Single API calls are great, but chaining them together is where the magic happens
+	c := client.NewDummyClient("A response!", nil)
+	o := oracle.NewOracle("", oracle.WithClient(c))
+	ctx := context.Background()
+
+	//
+
+	name, _ := o.Ask(ctx, "I'm of opening a coffee shop. I want it to be Tucan themed. What are some ideas for branding and names?")
+	fmt.Println(name)
+	notes := oracle.NewDocuments(strings.NewReader("Brand notes: Bright colored, hipster, retro geek chic"))
+	theme, _ := o.Ask(ctx, "What should the theme be? Whats my gimmick? Work with my existing notes", notes)
+	fmt.Println(theme)
+	// In reality, we would use real images for inspiration
+	inspirations := oracle.NewVisuals(image.Image(nil), image.Image(nil))
+	prompt, _ := o.Ask(ctx,
+		"Given what we've talked about, create an LLM prompt that would create a logo for my coffee shop. Take inspiration from these photos",
+		inspirations,
+	)
+
+	f, _ := os.Create("logo.png")
+	logo := oracle.NewArtifacts(f)
+	o.Ask(ctx, prompt, logo)
 }
