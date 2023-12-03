@@ -79,6 +79,7 @@ func (p Prompt) GetArtifacts() ([]io.ReadWriter, error) {
 	for _, artifact := range p.Artifacts {
 		artifact, ok := artifact.(Artifact)
 		if !ok {
+
 			return nil, fmt.Errorf("error reading artifact")
 		}
 		_, err := artifact.contents.Write([]byte{}) // write nothing to test if it's writable
@@ -109,7 +110,6 @@ type Oracle struct {
 	previousInputs  []string
 	previousOutputs []string
 	client          LanguageModel
-	artifacts       map[string]image.Image
 }
 
 // Options is a function that modifies the Oracle.
@@ -126,9 +126,8 @@ func WithClient(client LanguageModel) Option {
 func NewOracle(token string, opts ...Option) *Oracle {
 	client := client.NewChatGPT(token)
 	o := &Oracle{
-		purpose:   "You are a helpful assistant",
-		client:    client,
-		artifacts: map[string]image.Image{},
+		purpose: "You are a helpful assistant",
+		client:  client,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -166,108 +165,6 @@ func (o *Oracle) SetPurpose(purpose string) {
 func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.previousInputs = append(o.previousInputs, givenInput)
 	o.previousOutputs = append(o.previousOutputs, idealCompletion)
-}
-
-const (
-	ReadOnlyRef  = "Page"
-	ReadWriteRef = "Artifact"
-)
-
-type Reference interface {
-	Describe() string
-}
-
-type References []Reference
-
-func (r References) AddTo(p *Prompt) {
-	for _, ref := range r {
-		switch ref.Describe() {
-		case ReadOnlyRef:
-			p.Pages = append(p.Pages, ref)
-		case ReadWriteRef:
-			p.Artifacts = append(p.Artifacts, ref)
-		}
-	}
-}
-
-type Page interface {
-	GetContent() ([]byte, error)
-}
-
-type ImagePage struct {
-	Image image.Image
-}
-
-func (i ImagePage) Describe() string {
-	return ReadOnlyRef
-}
-
-type Artifacts []Artifact
-
-type Artifact struct {
-	contents io.ReadWriter
-}
-
-func (a Artifact) Describe() string {
-	return ReadWriteRef
-}
-
-func (i *ImagePage) GetContent() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, i.Image)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func NewVisuals(image image.Image, images ...image.Image) References {
-	refs := []Reference{&ImagePage{Image: image}}
-	for _, image := range images {
-		refs = append(refs, &ImagePage{Image: image})
-	}
-	return refs
-}
-
-type DocumentPage struct {
-	contents io.Reader
-}
-
-func (d DocumentPage) Describe() string {
-	return ReadOnlyRef
-}
-func (i DocumentPage) GetContent() ([]byte, error) {
-	data, err := io.ReadAll(i.contents)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func NewDocuments(r io.Reader, a ...io.Reader) References {
-	refs := []Reference{}
-	a = append(a, r)
-	for _, doc := range a {
-		d, ok := doc.(io.Seeker)
-		if ok {
-			_, _ = d.Seek(0, io.SeekStart)
-		}
-		refs = append(refs, DocumentPage{contents: doc})
-	}
-	return refs
-}
-
-func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
-	references := References{}
-	references = append(references, Artifact{
-		contents: artifact,
-	})
-	for _, artifact := range a {
-		references = append(references, Artifact{
-			contents: artifact,
-		})
-	}
-	return references
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
@@ -318,5 +215,111 @@ func (o *Oracle) Reset() {
 	o.purpose = ""
 	o.previousInputs = []string{}
 	o.previousOutputs = []string{}
-	o.artifacts = make(map[string]image.Image)
+}
+
+//----------------------------------------
+
+type Reference interface {
+	Describe() string
+}
+
+type Page interface {
+	GetContent() ([]byte, error)
+}
+
+const (
+	ReadOnlyReference  = "Page"
+	ReadWriteReference = "Artifact"
+)
+
+type References []Reference
+
+func (r References) AddTo(p *Prompt) {
+	for _, ref := range r {
+		switch ref.Describe() {
+		case ReadOnlyReference:
+			p.Pages = append(p.Pages, ref)
+		case ReadWriteReference:
+			p.Artifacts = append(p.Artifacts, ref)
+		}
+	}
+}
+
+// ----------------------------------------
+
+type ImagePage struct {
+	Image image.Image
+}
+
+func (i ImagePage) Describe() string {
+	return ReadOnlyReference
+}
+func (i *ImagePage) GetContent() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, i.Image)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func NewVisuals(image image.Image, images ...image.Image) References {
+	refs := References{}
+	images = append(images, image)
+	for _, image := range images {
+		refs = append(refs, &ImagePage{Image: image})
+	}
+	return refs
+}
+
+// ----------------------------------------
+type DocumentPage struct {
+	contents io.Reader
+}
+
+func (d DocumentPage) Describe() string {
+	return ReadOnlyReference
+}
+func (i DocumentPage) GetContent() ([]byte, error) {
+	data, err := io.ReadAll(i.contents)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func NewDocuments(r io.Reader, a ...io.Reader) References {
+	refs := []Reference{}
+	a = append(a, r)
+	for _, doc := range a {
+		d, ok := doc.(io.Seeker)
+		if ok {
+			_, _ = d.Seek(0, io.SeekStart)
+		}
+		refs = append(refs, DocumentPage{contents: doc})
+	}
+	return refs
+}
+
+// ----------------------------------------
+
+type Artifact struct {
+	contents io.ReadWriter
+}
+
+func (a Artifact) Describe() string {
+	return ReadWriteReference
+}
+
+func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
+	references := References{}
+	references = append(references, Artifact{
+		contents: artifact,
+	})
+	for _, artifact := range a {
+		references = append(references, Artifact{
+			contents: artifact,
+		})
+	}
+	return references
 }
