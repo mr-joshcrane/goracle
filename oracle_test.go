@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -315,6 +316,104 @@ func TestPromptWithFaultyReferencesGivesErrorFeedback(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error reading pages, got %v", err)
 	}
+}
+
+func setupFiles(t *testing.T, n int, tempDir string) (paths []string) {
+	for i := 0; i < n; i++ {
+		f, err := os.Create(filepath.Join(tempDir, fmt.Sprintf("test%d.txt", i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = fmt.Fprint(f, i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, f.Name())
+	}
+	return paths
+}
+
+func TestNewFilesCanCreateACollectionOfFiles(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	tempFiles := setupFiles(t, 3, tempDir)
+	files, err := oracle.NewFiles(tempFiles...)
+	if err != nil {
+		t.Errorf("Error creating NewFiles: %s", err)
+	}
+	if len(files) != 3 {
+		t.Errorf("Expected 3 files, got %d", len(files))
+	}
+	for i, f := range files {
+		f, ok := f.(oracle.FilePage)
+		if !ok {
+			t.Errorf("Expected FilePage, got %T", f)
+		}
+		data, err := f.GetContent()
+		if err != nil {
+			t.Errorf("Error reading file: %s", err)
+		}
+		got := string(data)
+		want := fmt.Sprintf("%d", i)
+		if got != want {
+			t.Errorf("Expected %s, got %s", want, got)
+		}
+	}
+}
+
+func TestNewFilesContentsAreReadDynamicallyAtGetContentTime(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	tempFiles := setupFiles(t, 3, tempDir)
+	files, err := oracle.NewFiles(tempFiles...)
+	if err != nil {
+		t.Errorf("Error creating NewFiles: %s", err)
+	}
+	err = os.WriteFile(tempFiles[0], []byte("???"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f1, ok := files[0].(oracle.FilePage)
+	if !ok {
+		t.Errorf("Expected FilePage, got %T", f1)
+	}
+	got, err := f1.GetContent()
+	if err != nil {
+		t.Errorf("Error reading file: %s", err)
+	}
+	want := "???"
+	if string(got) != want {
+		t.Errorf("Expected %s, got %s", want, string(got))
+	}
+}
+
+func TestNewFolderCanCreateACollectionOfFiles(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	_ = setupFiles(t, 12, tempDir)
+	want := []string{"1", "11"}
+	files, err := oracle.NewFolder(tempDir, "*1.txt")
+	if err != nil {
+		t.Errorf("Error creating NewFolder: %s", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("Expected 2 files, got %d", len(files))
+	}
+	for i, f := range files {
+		f, ok := f.(oracle.FilePage)
+		if !ok {
+			t.Errorf("Expected FilePage, got %T", f)
+		}
+		data, err := f.GetContent()
+		if err != nil {
+			t.Errorf("Error reading file: %s", err)
+		}
+		got := string(data)
+		if got != want[i] {
+			t.Errorf("Expected %s, got %s", want, got)
+		}
+	}
+
 }
 
 // Examples

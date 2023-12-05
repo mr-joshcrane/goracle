@@ -7,6 +7,8 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mr-joshcrane/oracle/client"
@@ -274,14 +276,14 @@ func NewVisuals(image image.Image, images ...image.Image) References {
 
 // ----------------------------------------
 type DocumentPage struct {
-	contents io.Reader
+	Contents io.Reader
 }
 
 func (d DocumentPage) Describe() string {
 	return ReadOnlyReference
 }
 func (i DocumentPage) GetContent() ([]byte, error) {
-	data, err := io.ReadAll(i.contents)
+	data, err := io.ReadAll(i.Contents)
 	if err != nil {
 		return nil, err
 	}
@@ -296,9 +298,67 @@ func NewDocuments(r io.Reader, a ...io.Reader) References {
 		if ok {
 			_, _ = d.Seek(0, io.SeekStart)
 		}
-		refs = append(refs, DocumentPage{contents: doc})
+		refs = append(refs, DocumentPage{Contents: doc})
 	}
 	return refs
+}
+
+// ----------------------------------------
+type FilePage struct {
+	path string
+}
+
+func (f FilePage) Describe() string {
+	return ReadOnlyReference
+}
+
+func (f FilePage) GetContent() ([]byte, error) {
+	file, err := os.Open(f.path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func NewFolder(root string, pattern string) (References, error) {
+	paths := []string{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error walking path: %v", err)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		matched, err := filepath.Match(pattern, info.Name())
+		if err != nil {
+			return fmt.Errorf("error matching pattern: %v", err)
+		}
+		if matched {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return NewFiles(paths...)
+}
+
+func NewFiles(paths ...string) (References, error) {
+	refs := []Reference{}
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() {
+			return nil, err
+		}
+		refs = append(refs, FilePage{path: path})
+	}
+	return refs, nil
 }
 
 // ----------------------------------------
