@@ -208,7 +208,7 @@ func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := oracle.Folder(dir)
-	want := [][]byte{content1, content2}
+	want := []byte("cheese is made from milk\nthe sky is blue\n")
 	if !cmp.Equal(got, want) {
 		t.Fatal(cmp.Diff(want, got))
 	}

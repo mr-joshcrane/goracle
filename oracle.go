@@ -187,7 +187,8 @@ func Folder(root string) []byte {
 		if info.IsDir() {
 			return nil
 		}
-		contents = append(contents, File(path)...)
+		content := append(File(path), byte('\n'))
+		contents = append(contents, content...)
 		return nil
 	})
 	return contents
