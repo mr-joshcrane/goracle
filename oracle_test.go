@@ -172,6 +172,56 @@ func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 	}
 }
 
+func TestFileReference_ValidFileReturnsByteContents(t *testing.T) {
+	t.Parallel()
+	want := []byte("cheese is made from milk")
+	path := t.TempDir() + "/text.txt"
+	err := os.WriteFile(path, want, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := oracle.File(path)
+	if !bytes.Equal(got, want) {
+		t.Errorf("Expected %s, got %s", string(want), string(got))
+	}
+}
+
+func TestFileReference_InvalidFileReturnsEmptyBytes(t *testing.T) {
+	t.Parallel()
+	got := oracle.File("invalid/path")
+	if len(got) != 0 {
+		t.Errorf("Expected empty bytes, got %s", string(got))
+	}
+}
+
+func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
+	t.Parallel()
+	content1 := []byte("cheese is made from milk")
+	content2 := []byte("the sky is blue")
+	dir := t.TempDir()
+	err := os.WriteFile(dir+"/text1.txt", content1, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(dir+"/text2.txt", content2, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := oracle.Folder(dir)
+	want := [][]byte{content1, content2}
+	if !cmp.Equal(got, want) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
+	t.Parallel()
+	got := oracle.Folder("invalid/path")
+	if len(got) != 0 {
+		t.Errorf("Expected empty bytes, got %s", string(got))
+	}
+}
+
 // Examples
 
 func ExampleOracle_Ask_standardTextCompletion() {
