@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
@@ -35,13 +34,6 @@ type ImageResponse struct {
 }
 
 func imageRequest(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
-	artifacts, err := prompt.GetArtifacts()
-	if err != nil {
-		return nil, err
-	}
-	if len(artifacts) < 1 {
-		return nil, fmt.Errorf("no artifacts found, and I need that to store my drawing")
-	}
 	req, err := CreateImageRequest(token, prompt.GetQuestion())
 	if err != nil {
 		return nil, err
@@ -54,17 +46,11 @@ func imageRequest(ctx context.Context, token string, prompt Prompt) (io.Reader, 
 	if err != nil {
 		return nil, err
 	}
-	data, err := ParseLinkToImage(link)
+	_, err = ParseLinkToImage(link)
 	if err != nil {
 		return nil, err
 	}
-	for _, artifact := range artifacts {
-		_, err := io.Copy(artifact, data)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			continue
-		}
-	}
+
 	return strings.NewReader("I drew you a picture!"), nil
 }
 

@@ -3,9 +3,7 @@
 package oracle_test
 
 import (
-	"bytes"
 	"context"
-	"image"
 	"os"
 
 	"strings"
@@ -57,13 +55,10 @@ func TestOracleIntegration_RefersToDocuments(t *testing.T) {
 	}
 	f.Close()
 
-	fact1 := strings.NewReader("The sky is blue.")
-	fact2, err := os.Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	documents := oracle.NewDocuments(fact1, fact2)
-	answer, err := o.Ask(context.TODO(), "Can you repeat my two facts?", documents)
+	answer, err := o.Ask(context.TODO(), "Can you repeat my two facts?",
+		"the sky is blue",
+		oracle.File(f.Name()),
+	)
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -76,30 +71,6 @@ func TestOracleIntegration_RefersToDocuments(t *testing.T) {
 	}
 
 }
-
-func TestOracleIntegration_CreateAnImageThenDescribeIt(t *testing.T) {
-	t.Parallel()
-	o := newTestOracle(t)
-	buf := new(bytes.Buffer)
-	artifact := oracle.NewArtifacts(buf)
-	_, err := o.Ask(context.TODO(), "please create a simple red square on a black background, nothing else", artifact)
-	if err != nil {
-		t.Errorf("Error asking question: %s", err)
-	}
-	image, _, err := image.Decode(buf)
-	if err != nil {
-		t.Errorf("Error decoding image: %s", err)
-	}
-	images := oracle.NewVisuals(image)
-	answer, err := o.Ask(context.TODO(), "What color and shape is this?", images)
-	if err != nil {
-		t.Errorf("Error asking question: %s", err)
-	}
-	if !strings.Contains(answer, "red") && !strings.Contains(answer, "square") {
-		t.Errorf("Expected red, got %s", answer)
-	}
-}
-
 func TestOracleIntegration_CreateSpeechThenTranscribeIt(t *testing.T) {
 	t.Parallel()
 	o := newTestOracle(t)

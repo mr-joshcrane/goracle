@@ -27,8 +27,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetPages() ([]io.Reader, error)
-	GetArtifacts() ([]io.ReadWriter, error)
+	GetPages() [][]byte
 }
 
 type Transform interface {
@@ -72,27 +71,12 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
-	refs, _ := prompt.GetPages()
-	for i, reference := range refs {
+	pages := prompt.GetPages()
+	for i, page := range pages {
 		i++
-		contents, err := io.ReadAll(reference)
-		if err != nil {
-			contents = []byte(fmt.Sprintf("Error reading reference: %v", err))
-		}
-		if isPNG(contents) {
-			uri := PNGToDataURI(contents)
-			messages = append(messages, VisionMessage{
-				Role:    RoleUser,
-				Content: []map[string]string{{"type": "image_url", "image_url": uri}},
-			})
-			continue
-		}
-		if contents == nil {
-			contents = []byte(fmt.Sprintf("Reference %d: %s", i, reference))
-		}
 		messages = append(messages, TextMessage{
 			Role:    RoleUser,
-			Content: fmt.Sprintf("Reference %d: %s", i, contents),
+			Content: fmt.Sprintf("Reference %d: %s", i, page),
 		})
 	}
 	return messages
@@ -126,14 +110,6 @@ func NewDummyClient(FixedResponse string, err error) *Dummy {
 }
 
 func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	_, err := prompt.GetPages()
-	if err != nil {
-		return nil, err
-	}
-	_, err = prompt.GetArtifacts()
-	if err != nil {
-		return nil, err
-	}
 	d.P = prompt
 	return strings.NewReader(d.FixedResponse), d.Failure
 }
@@ -165,13 +141,6 @@ func NewChatGPT(token string) *ChatGPT {
 
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	messages := MessageFromPrompt(prompt)
-	artifacts, err := prompt.GetArtifacts()
-	if err != nil {
-		return nil, err
-	}
-	if len(artifacts) > 0 {
-		return imageRequest(ctx, c.Token, prompt)
-	}
 	for _, message := range messages {
 		if message.GetFormat() == MessageImage {
 			return c.visionCompletion(ctx, messages)

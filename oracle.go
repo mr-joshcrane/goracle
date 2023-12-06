@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"image"
-	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -20,8 +18,8 @@ type Prompt struct {
 	Purpose       string
 	InputHistory  []string
 	OutputHistory []string
-	Pages         References
-	Artifacts     References
+	Pages         [][]byte
+	Artifacts     [][]byte
 	Question      string
 }
 
@@ -54,47 +52,8 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-func (p Prompt) GetPages() ([]io.Reader, error) {
-	references := []io.Reader{}
-	errors := []error{}
-	for i := range p.Pages {
-		page, ok := p.Pages[i].(Page)
-		if !ok {
-			return nil, fmt.Errorf("error reading page")
-		}
-		data, err := page.GetContent()
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-		references = append(references, bytes.NewReader(data))
-	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("error reading pages: %v", errors)
-	}
-	return references, nil
-}
-
-func (p Prompt) GetArtifacts() ([]io.ReadWriter, error) {
-	artifacts := []io.ReadWriter{}
-	errors := []error{}
-	for _, artifact := range p.Artifacts {
-		artifact, ok := artifact.(Artifact)
-		if !ok {
-
-			return nil, fmt.Errorf("error reading artifact")
-		}
-		_, err := artifact.contents.Write([]byte{}) // write nothing to test if it's writable
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-		artifacts = append(artifacts, artifact.contents)
-	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("error reading artifacts: %v", errors)
-	}
-	return artifacts, nil
+func (p Prompt) GetPages() [][]byte {
+	return p.Pages
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -137,26 +96,6 @@ func NewOracle(token string, opts ...Option) *Oracle {
 	return o
 }
 
-// GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
-// question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, references ...References) Prompt {
-	var pages References
-	var artifacts References
-	p := Prompt{
-		Purpose:       o.purpose,
-		InputHistory:  o.previousInputs,
-		OutputHistory: o.previousOutputs,
-		Question:      question,
-		Pages:         pages,
-		Artifacts:     artifacts,
-	}
-	for _, reference := range references {
-		reference.AddTo(&p)
-	}
-
-	return p
-}
-
 // SetPurpose sets the purpose of the Oracle, which frames the models response.
 func (o *Oracle) SetPurpose(purpose string) {
 	o.purpose = purpose
@@ -171,9 +110,25 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string, references ...References) (string, error) {
-	prompt := o.GeneratePrompt(question, references...)
-	data, err := o.Completion(ctx, prompt)
+func (o Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
+	p := Prompt{
+		Purpose:       o.purpose,
+		InputHistory:  o.previousInputs,
+		OutputHistory: o.previousOutputs,
+		Question:      question,
+	}
+	for _, reference := range references {
+		switch r := reference.(type) {
+		case []byte:
+			p.Pages = append(p.Pages, r)
+		case string:
+			p.Pages = append(p.Pages, []byte(r))
+		default:
+			return "", fmt.Errorf("unprocessable reference type: %T", r)
+		}
+	}
+
+	data, err := o.Completion(ctx, p)
 	if err != nil {
 		return "", err
 	}
@@ -221,165 +176,27 @@ func (o *Oracle) Reset() {
 
 //----------------------------------------
 
-type Reference interface {
-	Describe() string
-}
-
-type Page interface {
-	GetContent() ([]byte, error)
-}
-
-const (
-	ReadOnlyReference  = "Page"
-	ReadWriteReference = "Artifact"
-)
-
-type References []Reference
-
-func (r References) AddTo(p *Prompt) {
-	for _, ref := range r {
-		switch ref.Describe() {
-		case ReadOnlyReference:
-			p.Pages = append(p.Pages, ref)
-		case ReadWriteReference:
-			p.Artifacts = append(p.Artifacts, ref)
-		}
-	}
-}
-
 // ----------------------------------------
 
-type ImagePage struct {
-	Image image.Image
-}
-
-func (i ImagePage) Describe() string {
-	return ReadOnlyReference
-}
-func (i *ImagePage) GetContent() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, i.Image)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func NewVisuals(image image.Image, images ...image.Image) References {
-	refs := References{}
-	images = append(images, image)
-	for _, image := range images {
-		refs = append(refs, &ImagePage{Image: image})
-	}
-	return refs
-}
-
-// ----------------------------------------
-type DocumentPage struct {
-	Contents io.Reader
-}
-
-func (d DocumentPage) Describe() string {
-	return ReadOnlyReference
-}
-func (i DocumentPage) GetContent() ([]byte, error) {
-	data, err := io.ReadAll(i.Contents)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func NewDocuments(r io.Reader, a ...io.Reader) References {
-	refs := []Reference{}
-	a = append(a, r)
-	for _, doc := range a {
-		d, ok := doc.(io.Seeker)
-		if ok {
-			_, _ = d.Seek(0, io.SeekStart)
-		}
-		refs = append(refs, DocumentPage{Contents: doc})
-	}
-	return refs
-}
-
-// ----------------------------------------
-type FilePage struct {
-	path string
-}
-
-func (f FilePage) Describe() string {
-	return ReadOnlyReference
-}
-
-func (f FilePage) GetContent() ([]byte, error) {
-	file, err := os.Open(f.path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func NewFolder(root string, pattern string) (References, error) {
-	paths := []string{}
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+func Folder(root string) []byte {
+	contents := []byte{}
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error walking path: %v", err)
+			return nil
 		}
 		if info.IsDir() {
 			return nil
 		}
-		matched, err := filepath.Match(pattern, info.Name())
-		if err != nil {
-			return fmt.Errorf("error matching pattern: %v", err)
-		}
-		if matched {
-			paths = append(paths, path)
-		}
+		contents = append(contents, File(path)...)
 		return nil
 	})
+	return contents
+}
+
+func File(path string) []byte {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return []byte{}
 	}
-	return NewFiles(paths...)
-}
-
-func NewFiles(paths ...string) (References, error) {
-	refs := []Reference{}
-	for _, path := range paths {
-		info, err := os.Stat(path)
-		if err != nil || info.IsDir() {
-			return nil, err
-		}
-		refs = append(refs, FilePage{path: path})
-	}
-	return refs, nil
-}
-
-// ----------------------------------------
-
-type Artifact struct {
-	contents io.ReadWriter
-}
-
-func (a Artifact) Describe() string {
-	return ReadWriteReference
-}
-
-func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
-	references := References{}
-	references = append(references, Artifact{
-		contents: artifact,
-	})
-	for _, artifact := range a {
-		references = append(references, Artifact{
-			contents: artifact,
-		})
-	}
-	return references
+	return data
 }
