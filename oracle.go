@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -200,4 +202,13 @@ func File(path string) []byte {
 		return []byte{}
 	}
 	return data
+}
+
+func Image(i image.Image) []byte {
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, i)
+	if err != nil {
+		return []byte{}
+	}
+	return buf.Bytes()
 }

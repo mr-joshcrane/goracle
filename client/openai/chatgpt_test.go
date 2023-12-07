@@ -1,4 +1,4 @@
-package client_test
+package openai_test
 
 import (
 	"bytes"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client"
 )
 
 func testPrompt() oracle.Prompt {

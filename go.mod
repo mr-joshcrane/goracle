@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/aiplatform v1.55.0 // indirect
 	github.com/cixtor/readability v1.0.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 )
