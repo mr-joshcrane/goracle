@@ -36,7 +36,7 @@ func textCompletion(ctx context.Context, token string, messages Messages) (io.Re
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, NewClientError(resp)
+		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	answer, err := ParseTextCompletionReponse(resp.Body)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"testing"
@@ -36,36 +37,6 @@ func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.
 	o := oracle.NewOracle("", oracle.WithClient(c))
 	o.SetPurpose("You are a test Oracle")
 	return o, c
-}
-
-func TestTextToSpeechWithTrivialTransformerReturnsItsInput(t *testing.T) {
-	t.Parallel()
-	o, _ := createTestOracle("Hello World", nil)
-	r, err := o.TextToSpeech(ctx(), "Hello World")
-	if err != nil {
-		t.Errorf("Error generating speech from text: %s", err)
-	}
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Errorf("Error reading speech: %s", err)
-	}
-	got := string(data)
-	if got != "Hello World" {
-		t.Errorf("Expected Hello World, got %s", string(data))
-	}
-}
-
-func TestSpeechToTextWithTrivialTransformerReturnsItsInput(t *testing.T) {
-	t.Parallel()
-	o, _ := createTestOracle("", nil)
-	reader := bytes.NewReader([]byte("Hello World"))
-	got, err := o.SpeechToText(ctx(), reader)
-	if err != nil {
-		t.Errorf("Error generating speech from text: %s", err)
-	}
-	if got != "Hello World" {
-		t.Errorf("Expected Hello World, got %s", got)
-	}
 }
 
 func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
@@ -158,7 +129,7 @@ func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 		"It's time to shine again",
 	)
 	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+		t.Fatalf("Error asking question: %s", err)
 	}
 	got := c.P.GetPages()
 	if len(got) != 2 {
@@ -169,6 +140,51 @@ func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 	}
 	if string(got[1]) != "It's time to shine again" {
 		t.Errorf("Expected It's time to shine again, got %s", string(got[1]))
+	}
+}
+
+func TestAskWithBytesReferenceReturnsCorrectPrompt(t *testing.T) {
+	t.Parallel()
+	o, c := createTestOracle("", nil)
+	_, err := o.Ask(ctx(), "Hello World?",
+		[]byte("It's time to shine"),
+	)
+	if err != nil {
+		t.Fatalf("Error asking question: %s", err)
+	}
+	got := c.P.GetPages()
+	if len(got) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(got))
+	}
+	if !bytes.Equal(got[0], []byte("It's time to shine")) {
+		t.Errorf("Expected It's time to shine, got %s", string(got[0]))
+	}
+}
+
+func TestAskWithImageReferenceProvidesCorrectPrompt(t *testing.T) {
+	t.Parallel()
+	o, c := createTestOracle("", nil)
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	_, err := o.Ask(ctx(), "Whats in this image?", img)
+	if err != nil {
+		t.Fatalf("Error asking question: %s", err)
+	}
+	got := c.P.GetPages()
+	if len(got) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(got))
+	}
+	if !bytes.Equal(got[0], oracle.Image(img)) {
+		t.Errorf("Expected %v, got %v", oracle.Image(img), got[0])
+	}
+}
+
+func TestAskWithSomeUnknownReferenceReturnsError(t *testing.T) {
+	t.Parallel()
+	o, _ := createTestOracle("", nil)
+	type Unsupported struct{}
+	_, err := o.Ask(ctx(), "Whats in this image?", Unsupported{})
+	if err == nil {
+		t.Fatalf("Expected error asking question, got nil")
 	}
 }
 
@@ -222,6 +238,27 @@ func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
 	}
 }
 
+func TestImageReference_ValidImageReturnsPNGEncodingasBytes(t *testing.T) {
+	t.Parallel()
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	got := oracle.Image(img)
+	want := []byte{137, 80, 78, 71, 13, 10, 26, 10}
+	if !bytes.Equal(got[:8], want) {
+		t.Errorf("Expected %v, got %v", want, got[:8])
+	}
+}
+
+func TestImageReference_InvalidImageReturnsPNGEncodingasBytes(t *testing.T) {
+	t.Parallel()
+	img := image.NewRGBA64(image.Rect(0, 0, 100, 100))
+	img.Rect = image.Rect(0, 0, 0, -1)
+	got := oracle.Image(img)
+	want := []byte{}
+	if !bytes.Equal(got, want) {
+		t.Errorf("Expected %v, got %v", want, got[:8])
+	}
+}
+
 // Examples
 
 func ExampleOracle_Ask_standardTextCompletion() {
@@ -235,41 +272,4 @@ func ExampleOracle_Ask_standardTextCompletion() {
 	}
 	fmt.Println(answer)
 	// Output: A friendly LLM response!
-}
-
-func ExampleOracle_Transform_textToSpeech() {
-	// Transform text to audio
-	// Requires a [strings.Reader] as the source
-	// Returns an [io.Reader] as the target
-	c := client.NewDummyClient("", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
-	ctx := context.Background()
-
-	speech, err := o.TextToSpeech(ctx, "Hello, world!")
-	if err != nil {
-		panic(err)
-	}
-	data, err := io.ReadAll(speech)
-	if err != nil {
-		panic(err)
-	}
-	_ = os.WriteFile("hello_world.wav", data, 0644)
-}
-
-func ExampleOracle_Transform_speechToText() {
-	// Transform audio to text
-	// Requires an [io.Reader] as the source
-	// Returns a [string] as the target
-	c := client.NewDummyClient("A transcript of your audio data", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
-	ctx := context.Background()
-
-	// In reality, this will be some reader containing audio data
-	r := bytes.NewReader([]byte(c.FixedResponse))
-	answer, err := o.SpeechToText(ctx, r)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(answer)
-	// Output: A transcript of your audio data
 }

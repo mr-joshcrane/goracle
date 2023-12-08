@@ -1,5 +1,6 @@
 package openai
 
+//
 import (
 	"bytes"
 	"context"
@@ -43,12 +44,12 @@ func WithVoice(voice Voice) TTSReqOptions {
 	}
 }
 
-func (c *ChatGPT) textToSpeech(ctx context.Context, transform Transform) error {
-	text, err := io.ReadAll(transform.GetSource())
+func TextToSpeech(ctx context.Context, token string, source io.Reader, target io.ReadWriter) error {
+	text, err := io.ReadAll(source)
 	if err != nil {
 		return err
 	}
-	req, err := CreateTextToSpeechRequest(c.Token, string(text))
+	req, err := CreateTextToSpeechRequest(token, string(text))
 	if err != nil {
 		return err
 	}
@@ -63,18 +64,17 @@ func (c *ChatGPT) textToSpeech(ctx context.Context, transform Transform) error {
 		}
 		return fmt.Errorf("bad status code: %d, %s", resp.StatusCode, string(data))
 	}
-	target := transform.GetTarget()
 	_, err = io.Copy(target, resp.Body)
 	return err
 }
 
-func (c *ChatGPT) speechToText(ctx context.Context, transform Transform) error {
-	audio, err := io.ReadAll(transform.GetSource())
+func SpeechToText(ctx context.Context, token string, source io.Reader, target io.ReadWriter) error {
+	audio, err := io.ReadAll(source)
 	if err != nil {
 		return err
 	}
 
-	req, err := CreateSpeechToTextRequest(c.Token, audio)
+	req, err := CreateSpeechToTextRequest(token, audio)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (c *ChatGPT) speechToText(ctx context.Context, transform Transform) error {
 	if err != nil {
 		return err
 	}
-	_, err = transform.GetTarget().Write(data)
+	_, err = target.Write(data)
 	return err
 }
 

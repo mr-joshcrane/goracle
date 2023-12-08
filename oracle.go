@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mr-joshcrane/oracle/client"
 )
@@ -21,21 +20,7 @@ type Prompt struct {
 	InputHistory  []string
 	OutputHistory []string
 	Pages         [][]byte
-	Artifacts     [][]byte
 	Question      string
-}
-
-type Transform struct {
-	Source io.Reader
-	Target io.ReadWriter
-}
-
-func (t Transform) GetSource() io.Reader {
-	return t.Source
-}
-
-func (t Transform) GetTarget() io.ReadWriter {
-	return t.Target
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -62,7 +47,6 @@ func (p Prompt) GetPages() [][]byte {
 // language model API call.
 type LanguageModel interface {
 	Completion(ctx context.Context, prompt client.Prompt) (io.Reader, error)
-	Transform(ctx context.Context, transform client.Transform) error
 }
 
 // Oracle is a struct that scaffolds a well formed Oracle, designed in a way
@@ -125,11 +109,12 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 			p.Pages = append(p.Pages, r)
 		case string:
 			p.Pages = append(p.Pages, []byte(r))
+		case image.Image:
+			p.Pages = append(p.Pages, Image(r))
 		default:
 			return "", fmt.Errorf("unprocessable reference type: %T", r)
 		}
 	}
-
 	data, err := o.Completion(ctx, p)
 	if err != nil {
 		return "", err
@@ -141,31 +126,9 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 	return string(answer), nil
 }
 
-func (o Oracle) SpeechToText(ctx context.Context, speech io.Reader) (string, error) {
-	out := new(bytes.Buffer)
-	err := o.client.Transform(ctx, Transform{
-		Source: speech,
-		Target: out,
-	})
-	return out.String(), err
-}
-
-func (o Oracle) TextToSpeech(ctx context.Context, text string) (io.Reader, error) {
-	out := new(bytes.Buffer)
-	err := o.Transform(ctx, Transform{
-		Source: strings.NewReader(text),
-		Target: out,
-	})
-	return out, err
-}
-
 // Completion is a wrapper around the underlying Large Language Model API call.
 func (o Oracle) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	return o.client.Completion(ctx, prompt)
-}
-
-func (o Oracle) Transform(ctx context.Context, transform Transform) error {
-	return o.client.Transform(ctx, transform)
 }
 
 // Reset clears the Oracle's previous chat history
@@ -175,10 +138,6 @@ func (o *Oracle) Reset() {
 	o.previousInputs = []string{}
 	o.previousOutputs = []string{}
 }
-
-//----------------------------------------
-
-// ----------------------------------------
 
 func Folder(root string) []byte {
 	contents := []byte{}

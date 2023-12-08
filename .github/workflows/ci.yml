@@ -16,11 +16,16 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
+      - uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}' # Replace with the name of your GitHub Actions secret
       - uses: actions/setup-go@v3
         with:
           go-version: stable
       - uses: actions/checkout@v3
-      - run: go test -tags=integration ./...
+      - run: |
+          export VERTEX_API_KEY=$(gcloud auth $VERTEX_PROJECT print-access-token)
+          go test -tags=integration ./...
         env: 
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   govulncheck:
