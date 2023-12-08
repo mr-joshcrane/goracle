@@ -25,7 +25,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.GOOGLE_CREDS }}'
       - run: |
-          export VERTEX_API_KEY=${{ steps.auth.outputs.access_token }} && \
+          export VERTEX_API_KEY=${{ steps.auth.outputs }} && \
           export VERTEX_PROJECT=${{ secrets.VERTEX_PROJECT }} && \
           export && \
           go test -tags=integration ./...
