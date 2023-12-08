@@ -29,6 +29,7 @@ jobs:
       - run: |
           export VERTEX_API_KEY=$(gcloud auth print-access-token) && \
           export VERTEX_PROJECT=${{ secrets.VERTEX_PROJECT }} && \
+          export && \
           go test -tags=integration ./...
         env: 
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
