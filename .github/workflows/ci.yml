@@ -24,7 +24,7 @@ jobs:
           go-version: stable
       - uses: actions/checkout@v3
       - run: |
-          export VERTEX_API_KEY=$(gcloud auth print-access-token)
+          export VERTEX_API_KEY=$(gcloud auth print-access-token) && \
           go test -tags=integration ./...
         env: 
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
