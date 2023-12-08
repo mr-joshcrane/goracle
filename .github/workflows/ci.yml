@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}' # Replace with the name of your GitHub Actions secret
+          credentials_json: '${{ secrets.GOOGLE_CREDS }}' # Replace with the name of your GitHub Actions secret
       - uses: actions/setup-go@v3
         with:
           go-version: stable
