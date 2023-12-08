@@ -24,10 +24,8 @@ jobs:
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GOOGLE_CREDS }}'
-      - name: Set up GCloud CLI
-        uses: 'google-github-actions/setup-gcloud@v1'
       - run: |
-          export VERTEX_API_KEY=$(gcloud auth print-access-token) && \
+          export VERTEX_API_KEY=${{ steps.auth.outputs.access_token }} && \
           export VERTEX_PROJECT=${{ secrets.VERTEX_PROJECT }} && \
           export && \
           go test -tags=integration ./...
