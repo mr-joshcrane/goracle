@@ -53,6 +53,10 @@ func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, err
 	return openai.Do(ctx, c.Token, prompt)
 }
 
+func (c *ChatGPT) CreateImage(ctx context.Context, prompt string) ([]byte, error) {
+	return openai.DoImageRequest(ctx, c.Token, prompt)
+}
+
 // --- Vertex client
 
 type Vertex struct {

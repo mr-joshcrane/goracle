@@ -72,22 +72,25 @@ func MessagesFromPrompt(token string, prompt Prompt) Messages {
 			var err error
 			page, err = visualQuestionAnswering(token, page, prompt)
 			if err != nil {
-				page = []byte("User attempted to provide an image, but failed")
+				page = []byte("User attempted to provide an image, but failed. The bot must tell the user that they failed, if they have not already")
 			}
 		}
 		instance.Messages = append(instance.Messages, Message{
 			Author:  "user",
-			Content: string(page),
+			Content: fmt.Sprintf("SYSTEM: USER PROVIDED FILE %d: %s", i+1, string(page)),
 		})
 		instance.Messages = append(instance.Messages, Message{
 			Author:  "bot",
-			Content: fmt.Sprintf("Thanks. I'll call this REFERENCE %d. ", i+1),
+			Content: "Understood. I will refer to this text in my future answers!",
 		})
 	}
 	instance.Messages = append(instance.Messages, Message{
 		Author:  "user",
 		Content: prompt.GetQuestion(),
 	})
+	fmt.Println("_____")
+	fmt.Println(instance)
+	fmt.Println("_____")
 	return instance
 
 }
