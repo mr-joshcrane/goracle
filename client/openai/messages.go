@@ -62,9 +62,17 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		if isPNG(page) {
 			uri := ConvertPNGToDataURI(page)
 			messages = append(messages, VisionMessage{
-				Role:    RoleUser,
-				Content: []map[string]string{{"type": "image_url", "image_url": uri}},
-			})
+				Role: RoleUser,
+				Content: []VisionImageURL{
+					{
+						Type: "image_url",
+						ImageURL: struct {
+							URL string `json:"url"`
+						}{
+							URL: uri,
+						},
+					},
+				}})
 			continue
 		}
 		messages = append(messages, TextMessage{

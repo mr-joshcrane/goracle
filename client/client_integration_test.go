@@ -1,6 +1,6 @@
 //go:build integration
 
-package oracle_test
+package client_test
 
 import (
 	"context"
@@ -107,32 +107,50 @@ func TestOracleIntegration_RefersToDocuments(t *testing.T) {
 }
 
 func TestOracleIntegration_RefersToImages(t *testing.T) {
-	t.Parallel()
 	cases := testCases(t)
-	gopher, err := os.Open("testdata/quokka.jpg")
+	quokka, err := os.Open("testdata/quokka.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer gopher.Close()
-	image, err := jpeg.Decode(gopher)
+	defer quokka.Close()
+	image, err := jpeg.Decode(quokka)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			ctx := context.Background()
 			o := c.Oracle
-			answer, err := o.Ask(context.TODO(), "What species is this?",
-				image,
-			)
+			answer, err := o.Ask(ctx, "What species is this?", image)
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
 			}
 			answer = strings.ToLower(answer)
 			if !strings.Contains(answer, "quokka") {
-				t.Errorf("Error reading from image, expected 'gopher', got %s", answer)
+				t.Errorf("Error identifying image, expected 'quokka', got %s", answer)
 			}
 		})
 	}
+}
+
+func TestOpenAIClient_TextToSpeechandSpeechToVoice(t *testing.T) {
+	t.Parallel()
+	c := client.NewChatGPT(os.Getenv("OPENAI_API_KEY"))
+	ctx := context.Background()
+	text := "hello world"
+	audio, err := c.CreateAudio(ctx, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript, err := c.CreateTranscript(ctx, audio)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.ToLower(transcript)
+	if !strings.Contains(got, "hello") || !strings.Contains(got, "world") {
+		t.Errorf("Expected 'hello world', got %s", got)
+	}
+
 }
 
 func newTestOracle(t *testing.T) *oracle.Oracle {
@@ -141,7 +159,8 @@ func newTestOracle(t *testing.T) *oracle.Oracle {
 	if token == "" {
 		t.Fatal("OPENAI_API_KEY is not set")
 	}
-	return oracle.NewOracle(token)
+	c := client.NewChatGPT(token)
+	return oracle.NewOracle(c)
 }
 
 func newVertexTestOracle(t *testing.T) *oracle.Oracle {
@@ -155,5 +174,5 @@ func newVertexTestOracle(t *testing.T) *oracle.Oracle {
 		t.Fatal("VERTEX_PROJECT is not set")
 	}
 	c := client.NewVertex(token, project)
-	return oracle.NewOracle("", oracle.WithClient(c))
+	return oracle.NewOracle(c)
 }

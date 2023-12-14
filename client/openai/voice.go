@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -44,57 +43,42 @@ func WithVoice(voice Voice) TTSReqOptions {
 	}
 }
 
-func TextToSpeech(ctx context.Context, token string, source io.Reader, target io.ReadWriter) error {
-	text, err := io.ReadAll(source)
+func TextToSpeech(ctx context.Context, token string, text string) ([]byte, error) {
+	req, err := CreateTextToSpeechRequest(token, text)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	req, err := CreateTextToSpeechRequest(token, string(text))
-	if err != nil {
-		return err
-	}
+	req = req.WithContext(ctx)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("bad status code: %d, %s", resp.StatusCode, string(data))
+		return nil, NewClientError(resp)
 	}
-	_, err = io.Copy(target, resp.Body)
-	return err
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
 }
 
-func SpeechToText(ctx context.Context, token string, source io.Reader, target io.ReadWriter) error {
-	audio, err := io.ReadAll(source)
-	if err != nil {
-		return err
-	}
-
+func SpeechToText(ctx context.Context, token string, audio []byte) (string, error) {
 	req, err := CreateSpeechToTextRequest(token, audio)
 	if err != nil {
-		return err
+		return "", err
 	}
+	req = req.WithContext(ctx)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("bad status code: %d, %s", resp.StatusCode, string(data))
+		return "", NewClientError(resp)
 	}
+	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, err = target.Write(data)
-	return err
+	return string(data), nil
 }
 
 func CreateTextToSpeechRequest(token string, text string, opts ...TTSReqOptions) (*http.Request, error) {
@@ -135,7 +119,6 @@ func CreateSpeechToTextRequest(token string, audio []byte) (*http.Request, error
 	if _, err := part.Write(audio); err != nil {
 		return nil, err
 	}
-
 	err = writer.Close()
 	if err != nil {
 		return nil, err
@@ -147,16 +130,4 @@ func CreateSpeechToTextRequest(token string, audio []byte) (*http.Request, error
 	req = addDefaultHeaders(token, req)
 	req.Header.Set("Content-Type", "multipart/form-data; boundary="+writer.Boundary())
 	return req, nil
-}
-
-func chunkify(data string, chunkSize int) []string {
-	var chunks []string
-	for i := 0; i < len(data); i += chunkSize {
-		end := i + chunkSize
-		if end > len(data) {
-			end = len(data)
-		}
-		chunks = append(chunks, data[i:end])
-	}
-	return chunks
 }

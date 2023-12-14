@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mr-joshcrane/oracle/client/google"
 	"github.com/mr-joshcrane/oracle/client/openai"
-	"github.com/mr-joshcrane/oracle/client/vertex"
 )
 
 // --- Prompts and Messages
@@ -57,6 +57,14 @@ func (c *ChatGPT) CreateImage(ctx context.Context, prompt string) ([]byte, error
 	return openai.DoImageRequest(ctx, c.Token, prompt)
 }
 
+func (c *ChatGPT) CreateTranscript(ctx context.Context, audio []byte) (string, error) {
+	return openai.SpeechToText(ctx, c.Token, audio)
+}
+
+func (c *ChatGPT) CreateAudio(ctx context.Context, text string) ([]byte, error) {
+	return openai.TextToSpeech(ctx, c.Token, text)
+}
+
 // --- Vertex client
 
 type Vertex struct {
@@ -71,5 +79,5 @@ func NewVertex(token string, projectID string) *Vertex {
 	}
 }
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return vertex.Completion(ctx, v.Token, vertex.ProjectID, prompt)
+	return google.Completion(ctx, v.Token, v.ProjectID, prompt)
 }

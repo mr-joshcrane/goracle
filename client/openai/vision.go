@@ -70,15 +70,10 @@ func CreateImageRequest(token string, prompt string) (*http.Request, error) {
 func ParseCreateImageResponse(resp *http.Response) (string, error) {
 	var imageResponse ImageResponse
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println(resp.Status)
-		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return "", NewClientError(resp)
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	err = json.Unmarshal(data, &imageResponse)
+	err := json.NewDecoder(resp.Body).Decode(&imageResponse)
 	if err != nil {
 		return "", err
 	}
@@ -108,12 +103,19 @@ type VisionImageURL struct {
 }
 
 type VisionMessage struct {
-	Role    string              `json:"role"`
-	Content []map[string]string `json:"content"`
+	Role    string           `json:"role"`
+	Content []VisionImageURL `json:"content"`
 }
 
 func (m VisionMessage) GetFormat() string {
 	return "Vision"
+}
+
+func (m VisionMessage) GetContent() string {
+	if len(m.Content) != 1 {
+		return ""
+	}
+	return m.Content[0].ImageURL.URL
 }
 
 type VisionRequest struct {
@@ -147,10 +149,10 @@ func CreateVisionRequest(token string, messages Messages) (*http.Request, error)
 	return req, nil
 }
 
-func ParseVisionRequest(resp *http.Response) (io.Reader, error) {
+func ParseVisionResponse(resp *http.Response) (io.Reader, error) {
 	var completion VisionCompletionResponse
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return nil, NewClientError(resp)
 	}
 	defer resp.Body.Close()
 	err := json.NewDecoder(resp.Body).Decode(&completion)
@@ -173,7 +175,7 @@ func visionCompletion(ctx context.Context, token string, message Messages) (io.R
 	if err != nil {
 		return nil, err
 	}
-	return ParseVisionRequest(resp)
+	return ParseVisionResponse(resp)
 }
 
 func isPNG(a []byte) bool {

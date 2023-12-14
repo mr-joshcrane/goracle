@@ -35,15 +35,7 @@ func textCompletion(ctx context.Context, token string, messages Messages) (io.Re
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-	answer, err := ParseTextCompletionReponse(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return answer, err
+	return ParseTextCompletionRequest(resp)
 }
 
 func CreateTextCompletionRequest(token string, model string, messages Messages) (*http.Request, error) {
@@ -63,15 +55,19 @@ func CreateTextCompletionRequest(token string, model string, messages Messages) 
 	return req, nil
 }
 
-func ParseTextCompletionReponse(r io.Reader) (io.Reader, error) {
-	resp := TextCompletionResponse{}
-	err := json.NewDecoder(r).Decode(&resp)
+func ParseTextCompletionRequest(resp *http.Response) (io.Reader, error) {
+	if http.StatusOK != resp.StatusCode {
+		return nil, NewClientError(resp)
+	}
+	defer resp.Body.Close()
+	var completion TextCompletionResponse
+	err := json.NewDecoder(resp.Body).Decode(&completion)
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.Choices) < 1 {
+	if len(completion.Choices) < 1 {
 		return nil, fmt.Errorf("no choices returned")
 	}
-	output := strings.NewReader(resp.Choices[0].Message.Content)
+	output := strings.NewReader(completion.Choices[0].Message.Content)
 	return output, nil
 }

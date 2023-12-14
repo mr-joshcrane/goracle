@@ -14,6 +14,11 @@ import (
 	"github.com/mr-joshcrane/oracle/client"
 )
 
+func TestMain(m *testing.M) {
+	result := m.Run()
+	os.Exit(result)
+}
+
 func compareReaders(t *testing.T, x, y io.Reader) {
 	xBytes, err := io.ReadAll(x)
 	if err != nil {
@@ -34,7 +39,7 @@ func ctx() context.Context {
 
 func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.Dummy) {
 	c := client.NewDummyClient(fixedResponse, err)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+	o := oracle.NewOracle(c)
 	o.SetPurpose("You are a test Oracle")
 	return o, c
 }
@@ -264,7 +269,7 @@ func TestImageReference_InvalidImageReturnsPNGEncodingasBytes(t *testing.T) {
 func ExampleOracle_Ask_standardTextCompletion() {
 	// Basic request response text flow
 	c := client.NewDummyClient("A friendly LLM response!", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+	o := oracle.NewOracle(c)
 	ctx := context.Background()
 	answer, err := o.Ask(ctx, "A user question")
 	if err != nil {

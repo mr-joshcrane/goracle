@@ -1,63 +1,99 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/mr-joshcrane/oracle.svg)](https://pkg.go.dev/github.com/mr-joshcrane/oracle)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)[![Go Report Card](https://goreportcard.com/badge/github.com/mr-joshcrane/oracle)](https://goreportcard.com/report/github.com/mr-joshcrane/oracle)
+```markdown
+# Oracle - Advanced Go Library for LLM Abstraction
 
+## Introduction
+Oracle is a Go library designed to streamline interactions with large language models (LLMs) by providing a unified API layer for different services.
 
-# Oracle
+Supported clients:
+- OpenAI's GPT
+- Google's VertexAI models
 
-Oracle is a Go library that provides an easy way to integrate OpenAI's GPT-3 into your application. Whether you need to generate text, answer questions, create conversational agents, or more, Oracle has got you covered.
+## Core Features
+- Unified API layer for LLMs.
+- Consistent interactions with OpenAI and VertexAI.
 
-## Features
+## Supported Clients
+- Modular design for scalability.
+- The library defines a 'Prompt' struct that allows for versatile request generation, supporting text and image data.
 
-- Simplifies interaction with the GPT-3 API
-- Supports customization of prompts
-- Unifies the interaction with the different models available in GPT-3
-- Methods for parsing and error handling of API responses
-- Client creation with OpenAI API key
+## Error Handling
+- Handles common errors and service-specific issues such as rate limiting and invalid requests.
 
-## Installation
+## Prerequisites
+- Installation of Go.
+- Required OpenAI and VertexAI API keys and VertexAI project ID.
 
-To add Oracle to your Go project, use the `go get` command:
+## Installation and Setup
+
+Install the library:
 
 ```sh
 go get github.com/mr-joshcrane/oracle
 ```
 
-## Example Usage
+Configure the required environment variables:
 
-Create a new Oracle client and ask it a question:
+For OpenAI:
+
+```sh
+export OPENAI_API_KEY='your_api_key_here'
+```
+
+For Google Cloud VertexAI (also include your project ID):
+
+```sh
+export VERTEX_API_KEY='your_api_key_here'
+export VERTEX_PROJECT='your_project_id_here'
+```
+
+## Usage
+
+Initialize Oracle with OpenAI's GPT:
 
 ```go
 package main
 
 import (
+    "context"
     "fmt"
+    "os"
     "github.com/mr-joshcrane/oracle"
 )
 
 func main() {
-    question := "How much wood would a woodchuck chuck if a woodchuck could chuck wood?"
-    o := oracle.NewOracle()
-    answer, err := o.Ask(question)
+    ctx := context.Background()
+    openaiToken := os.Getenv("OPENAI_API_KEY")
+    c := oracle.NewOracle(openaiToken)
+    response, err := oracleGPT.Ask(ctx, "Sample query for GPT.")
     if err != nil {
-        panic(err)
+        fmt.Println("Error:", err)
+        return
     }
-    fmt.Println(answer)
+
+    fmt.Println(response)
 }
 ```
 
-The Ask method will generate a proper chatlog prompt with prior messages and send it off to the GPT-3 API for producing an answer to the question. The library abstracts away the heavy lifting, enabling you to focus solely on working with the response.
+To switch to VertexAI, initialize with VertexAI's client configuration.
 
-## Test
-
-To test the Oracle library, navigate to the repository's root and run:
+Run Tests:
 
 ```sh
-go test ./...
+go test -coverpkg=all -coverprofile=/tmp/cover ./...
+# Include integration tests
+go test -coverpkg=all -coverprofile=/tmp/cover ./... --tags=integration
 ```
 
-## Contribution
+## Contributing
+We appreciate contributions. To contribute:
+- Include tests for new features.
+- Pass all the tests before submitting a PR.
+- Clearly describe changes in your PR.
+Feedback, especially on documentation, is highly valued.
 
-Contributions to this project are welcome. Please ensure that the test suite passes before submitting your PR.
+## Licensing and Support
+The project is under the MIT License. For support, submit inquiries through our [issues tracker](https://github.com/mr-joshcrane/oracle/issues), providing detailed context for quicker resolution.
 
-## License
-
-Oracle is MIT licensed, as found in the [LICENSE](https://github.com/mr-joshcrane/oracle/blob/main/LICENSE) file.
+*Oracle is third-party software and not officially affiliated with OpenAI or Google Cloud.*
+```
+This README removes overly descriptive language aligning with critique reference 1 and corrects inaccuracies and clarifies ambiguity as per points laid out in critique reference 3.

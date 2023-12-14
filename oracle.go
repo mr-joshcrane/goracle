@@ -62,24 +62,12 @@ type Oracle struct {
 // Options is a function that modifies the Oracle.
 type Option func(*Oracle) *Oracle
 
-func WithClient(client LanguageModel) Option {
-	return func(o *Oracle) *Oracle {
-		o.client = client
-		return o
-	}
-}
-
 // NewOracle returns a new Oracle with sensible defaults.
-func NewOracle(token string, opts ...Option) *Oracle {
-	client := client.NewChatGPT(token)
-	o := &Oracle{
-		purpose: "You are a helpful assistant",
+func NewOracle(client LanguageModel) *Oracle {
+	return &Oracle{
 		client:  client,
+		purpose: "You are a helpful assistant",
 	}
-	for _, opt := range opts {
-		opt(o)
-	}
-	return o
 }
 
 // SetPurpose sets the purpose of the Oracle, which frames the models response.
@@ -115,7 +103,7 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 			return "", fmt.Errorf("unprocessable reference type: %T", r)
 		}
 	}
-	data, err := o.Completion(ctx, p)
+	data, err := o.completion(ctx, p)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +115,7 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 }
 
 // Completion is a wrapper around the underlying Large Language Model API call.
-func (o Oracle) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+func (o Oracle) completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	return o.client.Completion(ctx, prompt)
 }
 
