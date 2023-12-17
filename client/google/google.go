@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
-	"os"
 	"strings"
 )
 
@@ -147,18 +145,12 @@ func visionCompletion(ctx context.Context, token string, projectID string, messa
 	if err != nil {
 		return nil, err
 	}
-	re1, err := httputil.DumpRequest(req, true)
-	os.WriteFile("req.txt", re1, 0644)
-
 	req.Header.Add("Authorization", "Bearer "+token)
 	req.Header.Add("Content-Type", "application/json; charset=utf-8")
 	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
-	re2, err := httputil.DumpResponse(resp, true)
-	os.WriteFile("resp.txt", re2, 0644)
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status code: %d; %s", resp.StatusCode, resp.Status)
 	}
