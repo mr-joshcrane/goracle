@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client"
 	"golang.org/x/tools/cover"
 )
 
@@ -79,9 +79,9 @@ func ctx() context.Context {
 	return context.TODO()
 }
 
-func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.Dummy) {
+func createTestOracle(fixedResponse string, err error) (*goracle.Oracle, *client.Dummy) {
 	c := client.NewDummyClient(fixedResponse, err)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	o.SetPurpose("You are a test Oracle")
 	return o, c
 }
@@ -96,7 +96,7 @@ func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
 	if got != "Hello World" {
 		t.Errorf("Expected Hello World, got %s", got)
 	}
-	want := oracle.Prompt{
+	want := goracle.Prompt{
 		Purpose:  "You are a test Oracle",
 		Question: "Hello World",
 	}
@@ -119,7 +119,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
+	want := goracle.Prompt{
 		InputHistory:  []string{},
 		OutputHistory: []string{},
 		Question:      "Hello World",
@@ -131,7 +131,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 
 func TestPromptAccessorMethods(t *testing.T) {
 	t.Parallel()
-	prompt := oracle.Prompt{
+	prompt := goracle.Prompt{
 		Purpose:       "You are a test Oracle",
 		Question:      "Hello World",
 		InputHistory:  []string{"Hello World"},
@@ -220,8 +220,8 @@ func TestAskWithImageReferenceProvidesCorrectPrompt(t *testing.T) {
 	if len(got) != 1 {
 		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
-	if !bytes.Equal(got[0], oracle.Image(img)) {
-		t.Errorf("Expected %v, got %v", oracle.Image(img), got[0])
+	if !bytes.Equal(got[0], goracle.Image(img)) {
+		t.Errorf("Expected %v, got %v", goracle.Image(img), got[0])
 	}
 }
 
@@ -243,7 +243,7 @@ func TestFileReference_ValidFileReturnsByteContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := oracle.File(path)
+	got := goracle.File(path)
 	if !bytes.Equal(got, want) {
 		t.Errorf("Expected %s, got %s", string(want), string(got))
 	}
@@ -251,7 +251,7 @@ func TestFileReference_ValidFileReturnsByteContents(t *testing.T) {
 
 func TestFileReference_InvalidFileReturnsEmptyBytes(t *testing.T) {
 	t.Parallel()
-	got := oracle.File("invalid/path")
+	got := goracle.File("invalid/path")
 	if len(got) != 0 {
 		t.Errorf("Expected empty bytes, got %s", string(got))
 	}
@@ -270,7 +270,7 @@ func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := oracle.Folder(dir)
+	got := goracle.Folder(dir)
 	want := []byte("cheese is made from milk\nthe sky is blue\n")
 	if !cmp.Equal(got, want) {
 		t.Fatal(cmp.Diff(want, got))
@@ -279,7 +279,7 @@ func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
 
 func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
 	t.Parallel()
-	got := oracle.Folder("invalid/path")
+	got := goracle.Folder("invalid/path")
 	if len(got) != 0 {
 		t.Errorf("Expected empty bytes, got %s", string(got))
 	}
@@ -288,7 +288,7 @@ func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
 func TestImageReference_ValidImageReturnsPNGEncodingasBytes(t *testing.T) {
 	t.Parallel()
 	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	got := oracle.Image(img)
+	got := goracle.Image(img)
 	want := []byte{137, 80, 78, 71, 13, 10, 26, 10}
 	if !bytes.Equal(got[:8], want) {
 		t.Errorf("Expected %v, got %v", want, got[:8])
@@ -299,7 +299,7 @@ func TestImageReference_InvalidImageReturnsPNGEncodingasBytes(t *testing.T) {
 	t.Parallel()
 	img := image.NewRGBA64(image.Rect(0, 0, 100, 100))
 	img.Rect = image.Rect(0, 0, 0, -1)
-	got := oracle.Image(img)
+	got := goracle.Image(img)
 	want := []byte{}
 	if !bytes.Equal(got, want) {
 		t.Errorf("Expected %v, got %v", want, got[:8])
@@ -311,7 +311,7 @@ func TestImageReference_InvalidImageReturnsPNGEncodingasBytes(t *testing.T) {
 func ExampleOracle_Ask_standardTextCompletion() {
 	// Basic request response text flow
 	c := client.NewDummyClient("A friendly LLM response!", nil)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 	answer, err := o.Ask(ctx, "A user question")
 	if err != nil {
@@ -324,15 +324,15 @@ func ExampleOracle_Ask_standardTextCompletion() {
 func ExampleOracle_Ask_withReferences() {
 	// Basic request response text flow with multi-modal references
 	c := client.NewDummyClient("Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt", nil)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 	nonCheeseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	answer, err := o.Ask(ctx,
 		"My question for you is, do any of my references make mention of swiss cheese?",
 		"Some long chunk of text, that is notably non related",
-		oracle.File("invoice.txt"),
+		goracle.File("invoice.txt"),
 		nonCheeseImage,
-		oracle.Folder("~/cheeseDocs/"),
+		goracle.Folder("~/cheeseDocs/"),
 	)
 	if err != nil {
 		panic(err)
@@ -344,7 +344,7 @@ func ExampleOracle_Ask_withReferences() {
 func ExampleOracle_Ask_withExamples() {
 	// Examples allow you to guide the LLM with n-shot learning
 	c := client.NewDummyClient("42", nil)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	o.GiveExample("Fear is the...", "mind killer")
 	o.GiveExample("With great power comes...", "great responsibility")
 	ctx := context.Background()
@@ -361,11 +361,11 @@ func ExampleOracle_Ask_withConversationMemory() {
 	// and depend on the previous answers
 	// this is the default and matches the typical chatbot experience
 	c := client.NewDummyClient("We talked about the answer to life, the universe, and everything", nil)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 
 	// This is the default, but can be set manually
-	oracle.Stateful(o)
+	goracle.Stateful(o)
 	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
@@ -382,11 +382,11 @@ func ExampleOracle_Ask_withoutConversationMemory() {
 	// For when you want the responses to be Stateless
 	// and not depend on the previous answers/examples
 	c := client.NewDummyClient("Nothing so far", nil)
-	o := oracle.NewOracle(c)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 
 	//
-	oracle.Stateless(o)
+	goracle.Stateless(o)
 	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)

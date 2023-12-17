@@ -6,8 +6,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/mr-joshcrane/oracle"
-	clientc "github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client"
 )
 
 func main() {
@@ -27,10 +27,10 @@ func iterateOnReadme(i int, wg *sync.WaitGroup) {
 		return
 	}
 	// --- Generate
-	c := clientc.NewChatGPT(token)
+	c := client.NewChatGPT(token)
 	// c := client.VertexAI() // We could easily swap out the client here
 
-	generator := oracle.NewOracle(c)
+	generator := goracle.NewOracle(c)
 
 	response, err := generator.Ask(ctx,
 		` I am editing my README.md file. I want to make it better, and I included the source code so you can read it.
@@ -40,10 +40,10 @@ func iterateOnReadme(i int, wg *sync.WaitGroup) {
 		    Have a section on the Ask method does and how you can use it.
 			  Have a section on what a Reference is conceptually, the different types supported, and how you can use it.
 		`,
-		oracle.File("README.md"),
-		oracle.File("oracle.go"),
-		oracle.File("oracle_test.go"),
-		oracle.File("client/client_integration_test.go"),
+		goracle.File("README.md"),
+		goracle.File("goracle.go"),
+		goracle.File("oracle_test.go"),
+		goracle.File("client/client_integration_test.go"),
 	)
 	if err != nil {
 		fmt.Println("Error:", err)

@@ -17,13 +17,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client"
-	"github.com/mr-joshcrane/oracle/client/openai"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client"
+	"github.com/mr-joshcrane/goracle/client/openai"
 )
 
-func testPrompt() oracle.Prompt {
-	return oracle.Prompt{
+func testPrompt() goracle.Prompt {
+	return goracle.Prompt{
 		Purpose:       "A test purpose",
 		InputHistory:  []string{"GivenInput", "GivenInput2"},
 		OutputHistory: []string{"IdealOutput", "IdealOutput2"},
@@ -102,7 +102,7 @@ func TestNewChatGPTToken(t *testing.T) {
 
 func TestMessageFromPrompt(t *testing.T) {
 	t.Parallel()
-	prompt := oracle.Prompt{}
+	prompt := goracle.Prompt{}
 	msg := openai.MessageFromPrompt(prompt)
 	if len(msg) != 2 {
 		t.Errorf("Expected 2 message, got %d ::: %v", len(msg), msg)
@@ -154,7 +154,7 @@ func TestMessageFromPromptWithImages(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error encoding test image: %s", err)
 	}
-	prompt := oracle.Prompt{
+	prompt := goracle.Prompt{
 		References: [][]byte{buf.Bytes()},
 	}
 	messages := openai.MessageFromPrompt(prompt)
@@ -177,7 +177,7 @@ func TestMessageFromPromptWithImages(t *testing.T) {
 func TestGetCompletionWithInvalidTokenErrors(t *testing.T) {
 	t.Parallel()
 	c := client.NewChatGPT("dummy-token-openai")
-	_, err := c.Completion(context.Background(), oracle.Prompt{})
+	_, err := c.Completion(context.Background(), goracle.Prompt{})
 	want := &openai.ClientError{}
 	if !errors.As(err, want) {
 		t.Errorf("Expected %v, got %v", want, err)

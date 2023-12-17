@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mr-joshcrane/oracle/client/google"
-	"github.com/mr-joshcrane/oracle/client/openai"
+	"github.com/mr-joshcrane/goracle/client/google"
+	"github.com/mr-joshcrane/goracle/client/openai"
 )
 
 // --- Prompts and Messages

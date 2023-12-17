@@ -1,4 +1,4 @@
-package oracle
+package goracle
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle/client"
 )
 
 // Prompt is a struct that scaffolds a well formed prompt, designed in a way

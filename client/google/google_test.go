@@ -1,12 +1,12 @@
 package google_test
 
 import (
-	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client/google"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client/google"
 )
 
-func testPrompt() oracle.Prompt {
-	return oracle.Prompt{
+func testPrompt() goracle.Prompt {
+	return goracle.Prompt{
 		Purpose:       "A test purpose",
 		InputHistory:  []string{"GivenInput", "GivenInput2"},
 		OutputHistory: []string{"IdealOutput", "IdealOutput2"},

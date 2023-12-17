@@ -1,6 +1,6 @@
-package oracle
+package goracle
 
-import "github.com/mr-joshcrane/oracle/client/openai"
+import "github.com/mr-joshcrane/goracle/client/openai"
 
 type ClientError struct {
 	openai.ClientError

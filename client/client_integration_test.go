@@ -11,12 +11,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client"
 )
 
 type testCase struct {
-	Oracle      *oracle.Oracle
+	Oracle      *goracle.Oracle
 	Description string
 }
 
@@ -90,7 +90,7 @@ func TestOracleIntegration_RefersToDocuments(t *testing.T) {
 
 			answer, err := o.Ask(context.TODO(), "Can you repeat my two facts?",
 				"the sky is blue",
-				oracle.File(f.Name()),
+				goracle.File(f.Name()),
 			)
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
@@ -153,17 +153,17 @@ func TestOpenAIClient_TextToSpeechandSpeechToVoice(t *testing.T) {
 
 }
 
-func newTestOracle(t *testing.T) *oracle.Oracle {
+func newTestOracle(t *testing.T) *goracle.Oracle {
 	t.Helper()
 	token := os.Getenv("OPENAI_API_KEY")
 	if token == "" {
 		t.Fatal("OPENAI_API_KEY is not set")
 	}
 	c := client.NewChatGPT(token)
-	return oracle.NewOracle(c)
+	return goracle.NewOracle(c)
 }
 
-func newVertexTestOracle(t *testing.T) *oracle.Oracle {
+func newVertexTestOracle(t *testing.T) *goracle.Oracle {
 	t.Helper()
 	token := os.Getenv("VERTEX_API_KEY")
 	if token == "" {
@@ -174,5 +174,5 @@ func newVertexTestOracle(t *testing.T) *oracle.Oracle {
 		t.Fatal("VERTEX_PROJECT is not set")
 	}
 	c := client.NewVertex()
-	return oracle.NewOracle(c)
+	return goracle.NewOracle(c)
 }
