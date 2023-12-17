@@ -19,21 +19,21 @@ type Prompt interface {
 
 // --- Dummy Client
 type Dummy struct {
-	FixedResponse string
+	fixedResponse string
 	Failure       error
 	P             Prompt
 }
 
-func NewDummyClient(FixedResponse string, err error) *Dummy {
+func NewDummyClient(fixedResponse string, err error) *Dummy {
 	return &Dummy{
-		FixedResponse: FixedResponse,
+		fixedResponse: fixedResponse,
 		Failure:       err,
 	}
 }
 
 func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	d.P = prompt
-	return strings.NewReader(d.FixedResponse), d.Failure
+	return strings.NewReader(d.fixedResponse), d.Failure
 }
 
 // --- ChatGPT Client

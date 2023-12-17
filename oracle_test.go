@@ -28,7 +28,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	coverProfile := fmt.Sprintf("-coverprofile=%s", path)
-	defer f.Close()
 	tags := []string{"test", "-coverpkg=./...", "./...", coverProfile, "-args", "ALL"}
 	if lastArg == "--integration" {
 		tags = []string{"test", "-coverpkg=./...", "./...", "--tags=integration", coverProfile, "-args", "ALL"}
@@ -37,6 +36,7 @@ func TestMain(m *testing.M) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(out))
+		f.Close()
 		os.Exit(1)
 	}
 	if strings.Contains(string(out), "FAIL") {
@@ -45,6 +45,7 @@ func TestMain(m *testing.M) {
 	profiles, err := cover.ParseProfiles(path)
 	if err != nil {
 		fmt.Println(err)
+		f.Close()
 		os.Exit(1)
 	}
 	var globalTested, globalTestable int
@@ -70,8 +71,10 @@ func TestMain(m *testing.M) {
 
 	if err != nil {
 		fmt.Println(err)
+		f.Close()
 		os.Exit(1)
 	}
+	f.Close()
 	os.Exit(0)
 }
 
