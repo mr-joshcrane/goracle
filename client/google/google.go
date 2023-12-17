@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"strings"
 )
 
@@ -32,6 +33,25 @@ type ChatMessage struct {
 
 type MessagePart struct {
 	Text string `json:"text,omitempty"`
+}
+
+// More serious authentication methods left as an exercise to the reader
+// https://cloud.google.com/docs/authentication
+func Authenticate() (clientID string, token string, err error) {
+	cmd := exec.Command("gcloud", "auth", "print-access-token")
+	tokenOut, err := cmd.Output()
+	if err != nil {
+		return "", "", fmt.Errorf("error getting GCP token: %w", err)
+	}
+	token = strings.TrimSpace(string(tokenOut))
+
+	cmd = exec.Command("gcloud", "config", "get-value", "project")
+	projectOut, err := cmd.Output()
+	if err != nil {
+		return "", "", fmt.Errorf("error getting GCP project: %w", err)
+	}
+	clientID = strings.TrimSpace(string(projectOut))
+	return clientID, token, nil
 }
 
 func MessagesFromPrompt(prompt Prompt) []ChatMessage {
@@ -184,7 +204,11 @@ func visionCompletion(ctx context.Context, token string, projectID string, messa
 	return strings.NewReader(answer), nil
 }
 
-func Completion(ctx context.Context, token string, projectID string, prompt Prompt) (io.Reader, error) {
+func Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	project, token, err := Authenticate()
+	if err != nil {
+		return nil, err
+	}
 	strategy := textCompletion
 	messages := MessagesFromPrompt(prompt)
 	for _, message := range messages {
@@ -193,7 +217,7 @@ func Completion(ctx context.Context, token string, projectID string, prompt Prom
 			break
 		}
 	}
-	answer, err := strategy(ctx, token, projectID, messages)
+	answer, err := strategy(ctx, token, project, messages)
 	if err != nil {
 		return nil, err
 	}

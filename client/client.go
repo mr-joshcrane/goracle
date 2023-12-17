@@ -72,12 +72,10 @@ type Vertex struct {
 	ProjectID string
 }
 
-func NewVertex(token string, projectID string) *Vertex {
-	return &Vertex{
-		Token:     token,
-		ProjectID: projectID,
-	}
+func NewVertex() *Vertex {
+	return &Vertex{}
 }
+
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return google.Completion(ctx, v.Token, v.ProjectID, prompt)
+	return google.Completion(ctx, prompt)
 }

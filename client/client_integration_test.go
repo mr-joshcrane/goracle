@@ -173,6 +173,6 @@ func newVertexTestOracle(t *testing.T) *oracle.Oracle {
 	if project == "" {
 		t.Fatal("VERTEX_PROJECT is not set")
 	}
-	c := client.NewVertex(token, project)
+	c := client.NewVertex()
 	return oracle.NewOracle(c)
 }
