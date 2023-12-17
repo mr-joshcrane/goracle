@@ -5,32 +5,74 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"io"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/oracle"
 	"github.com/mr-joshcrane/oracle/client"
+	"golang.org/x/tools/cover"
 )
 
 func TestMain(m *testing.M) {
-	result := m.Run()
-	os.Exit(result)
-}
+	lastArg := os.Args[len(os.Args)-1]
+	if lastArg == "ALL" {
+		os.Exit(m.Run())
+	}
+	path := os.TempDir() + "/coverage.out"
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	coverProfile := fmt.Sprintf("-coverprofile=%s", path)
+	defer f.Close()
+	tags := []string{"test", "-coverpkg=./...", "./...", coverProfile, "-args", "ALL"}
+	if lastArg == "--integration" {
+		tags = []string{"test", "-coverpkg=./...", "./...", "--tags=integration", coverProfile, "-args", "ALL"}
+	}
+	cmd := exec.Command("go", tags...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(string(out))
+		os.Exit(1)
+	}
+	if strings.Contains(string(out), "FAIL") {
+		fmt.Println(string(out))
+	}
+	profiles, err := cover.ParseProfiles(path)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	var globalTested, globalTestable int
+	for _, profile := range profiles {
+		var tested, testable int
+		for _, block := range profile.Blocks {
+			lineCount := block.EndLine - block.StartLine
+			if block.NumStmt > 0 {
+				testable += lineCount
+			}
+			if block.Count > 0 && block.NumStmt > 0 {
+				tested += lineCount
+			}
+		}
+		percentageTested := float64(tested) / float64(testable) * 100
+		fmt.Printf("%.2f%% - %s\n", percentageTested, profile.FileName)
+		globalTested += tested
+		globalTestable += testable
+	}
 
-func compareReaders(t *testing.T, x, y io.Reader) {
-	xBytes, err := io.ReadAll(x)
+	percentageTested := float64(globalTested) / float64(globalTestable) * 100
+	fmt.Printf("\nOverall Coverage: %.2f%%\n", percentageTested)
+
 	if err != nil {
-		t.Fatalf("Error reading reference X: %s", err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	yBytes, err := io.ReadAll(y)
-	if err != nil {
-		t.Fatalf("Error reading reference Y: %s", err)
-	}
-	if !bytes.Equal(xBytes, yBytes) {
-		t.Fatalf("Expected %s, got %s", string(xBytes), string(yBytes))
-	}
+	os.Exit(0)
 }
 
 func ctx() context.Context {

@@ -6,7 +6,7 @@ Oracle is a Go library designed to streamline interactions with large language m
 
 Supported clients:
 - OpenAI's GPT
-- Google's VertexAI models
+- Google's VertexAI models (including Gemini)
 
 ## Core Features
 - Unified API layer for LLMs.
@@ -39,11 +39,12 @@ For OpenAI:
 export OPENAI_API_KEY='your_api_key_here'
 ```
 
-For Google Cloud VertexAI (also include your project ID):
+For Google Cloud, be sure to have set up your authentication with the `gcloud`
+CLI. If you can get a valid token with the below command, you should be in
+business.
 
 ```sh
-export VERTEX_API_KEY='your_api_key_here'
-export VERTEX_PROJECT='your_project_id_here'
+gcloud auth --print-access-token
 ```
 
 ## Usage
@@ -77,11 +78,14 @@ func main() {
 To switch to VertexAI, initialize with VertexAI's client configuration.
 
 Run Tests:
+The `oracle_test.go` MainTest function has been modified to run all subtests
+collecting coverage information. To run them...
 
 ```sh
-go test -coverpkg=all -coverprofile=/tmp/cover ./...
+# For unit tests only and file coverage
+go test 
 # Include integration tests
-go test -coverpkg=all -coverprofile=/tmp/cover ./... --tags=integration
+go test --integration
 ```
 
 ## Contributing

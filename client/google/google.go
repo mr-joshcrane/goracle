@@ -122,9 +122,7 @@ func visionCompletion(ctx context.Context, token string, projectID string, messa
 
 	var text string
 	for _, message := range messages {
-		fmt.Println("is png?")
 		if isPNG([]byte(message.Parts.Text)) {
-			fmt.Println("is png")
 			payload.Contents[0].Parts = append(payload.Contents[0].Parts, struct {
 				InlineData VisualInlineData `json:"inlineData,omitempty"`
 			}{
@@ -191,7 +189,6 @@ func visionCompletion(ctx context.Context, token string, projectID string, messa
 		}
 	}
 	answer = strings.Trim(answer, " ")
-	fmt.Println(answer)
 	return strings.NewReader(answer), nil
 }
 
@@ -201,7 +198,6 @@ func Completion(ctx context.Context, token string, projectID string, prompt Prom
 	for _, message := range messages {
 		if isPNG([]byte(message.Parts.Text)) {
 			strategy = visionCompletion
-			fmt.Println("Vision time")
 			break
 		}
 	}
