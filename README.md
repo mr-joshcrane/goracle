@@ -8,7 +8,7 @@ GOracle is a convenience library designed to help Golang developers bring the po
 
 It's designed to be small, simple, and powerful!
 
-In fact, this README was ghost written by an LLM, with a lot of oversight from his human editor.
+In fact, this README was ghost written by an LLM, with a lot of oversight from it's human editor.
 Check out the [code here](examples/readme/main.go)! 
 
 ## Features
