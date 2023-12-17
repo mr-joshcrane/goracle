@@ -1,4 +1,4 @@
-package client
+package openai
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
@@ -19,7 +18,6 @@ const (
 )
 
 // Image Generation Capability
-
 type ImageRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
@@ -34,15 +32,8 @@ type ImageResponse struct {
 	} `json:"data"`
 }
 
-func imageRequest(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
-	artifacts, err := prompt.GetArtifacts()
-	if err != nil {
-		return nil, err
-	}
-	if len(artifacts) < 1 {
-		return nil, fmt.Errorf("no artifacts found, and I need that to store my drawing")
-	}
-	req, err := CreateImageRequest(token, prompt.GetQuestion())
+func DoImageRequest(ctx context.Context, token string, prompt string) ([]byte, error) {
+	req, err := CreateImageRequest(token, prompt)
 	if err != nil {
 		return nil, err
 	}
@@ -54,18 +45,7 @@ func imageRequest(ctx context.Context, token string, prompt Prompt) (io.Reader, 
 	if err != nil {
 		return nil, err
 	}
-	data, err := ParseLinkToImage(link)
-	if err != nil {
-		return nil, err
-	}
-	for _, artifact := range artifacts {
-		_, err := io.Copy(artifact, data)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			continue
-		}
-	}
-	return strings.NewReader("I drew you a picture!"), nil
+	return ParseLinkToImage(link)
 }
 
 func CreateImageRequest(token string, prompt string) (*http.Request, error) {
@@ -90,15 +70,10 @@ func CreateImageRequest(token string, prompt string) (*http.Request, error) {
 func ParseCreateImageResponse(resp *http.Response) (string, error) {
 	var imageResponse ImageResponse
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println(resp.Status)
-		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return "", NewClientError(resp)
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	err = json.Unmarshal(data, &imageResponse)
+	err := json.NewDecoder(resp.Body).Decode(&imageResponse)
 	if err != nil {
 		return "", err
 	}
@@ -109,20 +84,16 @@ func ParseCreateImageResponse(resp *http.Response) (string, error) {
 	return imageUrl, nil
 }
 
-func ParseLinkToImage(link string) (io.Reader, error) {
+func ParseLinkToImage(link string) ([]byte, error) {
 	resp, err := http.DefaultClient.Get(link)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(data), nil
+	return io.ReadAll(resp.Body)
 }
 
-// Vision Capability
+// // Vision Capability
 
 type VisionImageURL struct {
 	Type     string `json:"type"`
@@ -132,12 +103,19 @@ type VisionImageURL struct {
 }
 
 type VisionMessage struct {
-	Role    string              `json:"role"`
-	Content []map[string]string `json:"content"`
+	Role    string           `json:"role"`
+	Content []VisionImageURL `json:"content"`
 }
 
 func (m VisionMessage) GetFormat() string {
-	return MessageImage
+	return "Vision"
+}
+
+func (m VisionMessage) GetContent() string {
+	if len(m.Content) != 1 {
+		return ""
+	}
+	return m.Content[0].ImageURL.URL
 }
 
 type VisionRequest struct {
@@ -171,7 +149,7 @@ func CreateVisionRequest(token string, messages Messages) (*http.Request, error)
 	return req, nil
 }
 
-func ParseVisionRequest(resp *http.Response) (io.Reader, error) {
+func ParseVisionResponse(resp *http.Response) (io.Reader, error) {
 	var completion VisionCompletionResponse
 	if resp.StatusCode != http.StatusOK {
 		return nil, NewClientError(resp)
@@ -188,8 +166,8 @@ func ParseVisionRequest(resp *http.Response) (io.Reader, error) {
 	return answer, nil
 }
 
-func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Reader, error) {
-	req, err := CreateVisionRequest(c.Token, message)
+func visionCompletion(ctx context.Context, token string, message Messages) (io.Reader, error) {
+	req, err := CreateVisionRequest(token, message)
 	if err != nil {
 		return nil, err
 	}
@@ -197,14 +175,14 @@ func (c *ChatGPT) visionCompletion(ctx context.Context, message Messages) (io.Re
 	if err != nil {
 		return nil, err
 	}
-	return ParseVisionRequest(resp)
+	return ParseVisionResponse(resp)
 }
 
 func isPNG(a []byte) bool {
 	return len(a) > 8 && bytes.Equal(a[:8], []byte("\x89PNG\x0d\x0a\x1a\x0a"))
 }
 
-func PNGToDataURI(data []byte) string {
+func ConvertPNGToDataURI(data []byte) string {
 	base64Str := base64.StdEncoding.EncodeToString(data)
 	dataURI := "data:image/png;base64," + base64Str
 	return dataURI

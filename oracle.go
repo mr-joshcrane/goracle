@@ -1,4 +1,4 @@
-package oracle
+package goracle
 
 import (
 	"bytes"
@@ -7,33 +7,21 @@ import (
 	"image"
 	"image/png"
 	"io"
-	"strings"
+	"os"
+	"path/filepath"
 
-	"github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle/client"
 )
 
 // Prompt is a struct that scaffolds a well formed prompt, designed in a way
-// that are ideal for Large Language Models.
+// that are ideal for Large Language Models. This is the abstraction we will pass
+// through to the client library so it can be handled appropriately
 type Prompt struct {
 	Purpose       string
 	InputHistory  []string
 	OutputHistory []string
-	Pages         References
-	Artifacts     References
+	References    [][]byte
 	Question      string
-}
-
-type Transform struct {
-	Source io.Reader
-	Target io.ReadWriter
-}
-
-func (t Transform) GetSource() io.Reader {
-	return t.Source
-}
-
-func (t Transform) GetTarget() io.ReadWriter {
-	return t.Target
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -52,54 +40,14 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-func (p Prompt) GetPages() ([]io.Reader, error) {
-	references := []io.Reader{}
-	errors := []error{}
-	for i := range p.Pages {
-		page, ok := p.Pages[i].(Page)
-		if !ok {
-			return nil, fmt.Errorf("error reading page")
-		}
-		data, err := page.GetContent()
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-		references = append(references, bytes.NewReader(data))
-	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("error reading pages: %v", errors)
-	}
-	return references, nil
-}
-
-func (p Prompt) GetArtifacts() ([]io.ReadWriter, error) {
-	artifacts := []io.ReadWriter{}
-	errors := []error{}
-	for _, artifact := range p.Artifacts {
-		artifact, ok := artifact.(Artifact)
-		if !ok {
-
-			return nil, fmt.Errorf("error reading artifact")
-		}
-		_, err := artifact.contents.Write([]byte{}) // write nothing to test if it's writable
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-		artifacts = append(artifacts, artifact.contents)
-	}
-	if len(errors) > 0 {
-		return nil, fmt.Errorf("error reading artifacts: %v", errors)
-	}
-	return artifacts, nil
+func (p Prompt) GetReferences() [][]byte {
+	return p.References
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
 // language model API call.
 type LanguageModel interface {
 	Completion(ctx context.Context, prompt client.Prompt) (io.Reader, error)
-	Transform(ctx context.Context, transform client.Transform) error
 }
 
 // Oracle is a struct that scaffolds a well formed Oracle, designed in a way
@@ -110,49 +58,33 @@ type Oracle struct {
 	previousInputs  []string
 	previousOutputs []string
 	client          LanguageModel
+	stateful        bool
 }
 
 // Options is a function that modifies the Oracle.
 type Option func(*Oracle) *Oracle
 
-func WithClient(client LanguageModel) Option {
-	return func(o *Oracle) *Oracle {
-		o.client = client
-		return o
+func Stateful(*Oracle) *Oracle {
+	return &Oracle{
+		stateful: true,
+	}
+}
+
+func Stateless(*Oracle) *Oracle {
+	return &Oracle{
+		previousInputs:  []string{},
+		previousOutputs: []string{},
+		stateful:        false,
 	}
 }
 
 // NewOracle returns a new Oracle with sensible defaults.
-func NewOracle(token string, opts ...Option) *Oracle {
-	client := client.NewChatGPT(token)
-	o := &Oracle{
-		purpose: "You are a helpful assistant",
-		client:  client,
+func NewOracle(client LanguageModel) *Oracle {
+	return &Oracle{
+		client:   client,
+		purpose:  "You are a helpful assistant",
+		stateful: true,
 	}
-	for _, opt := range opts {
-		opt(o)
-	}
-	return o
-}
-
-// GeneratePrompt generates a prompt from the Oracle's purpose, examples, and
-// question the current question posed by the user.
-func (o *Oracle) GeneratePrompt(question string, references ...References) Prompt {
-	var pages References
-	var artifacts References
-	p := Prompt{
-		Purpose:       o.purpose,
-		InputHistory:  o.previousInputs,
-		OutputHistory: o.previousOutputs,
-		Question:      question,
-		Pages:         pages,
-		Artifacts:     artifacts,
-	}
-	for _, reference := range references {
-		reference.AddTo(&p)
-	}
-
-	return p
 }
 
 // SetPurpose sets the purpose of the Oracle, which frames the models response.
@@ -169,9 +101,26 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string, references ...References) (string, error) {
-	prompt := o.GeneratePrompt(question, references...)
-	data, err := o.Completion(ctx, prompt)
+func (o *Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
+	p := Prompt{
+		Purpose:       o.purpose,
+		InputHistory:  o.previousInputs,
+		OutputHistory: o.previousOutputs,
+		Question:      question,
+	}
+	for _, reference := range references {
+		switch r := reference.(type) {
+		case []byte:
+			p.References = append(p.References, r)
+		case string:
+			p.References = append(p.References, []byte(r))
+		case image.Image:
+			p.References = append(p.References, Image(r))
+		default:
+			return "", fmt.Errorf("unprocessable reference type: %T", r)
+		}
+	}
+	data, err := o.completion(ctx, p)
 	if err != nil {
 		return "", err
 	}
@@ -179,34 +128,15 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...Referenc
 	if err != nil {
 		return "", err
 	}
+	if o.stateful {
+		o.GiveExample(question, string(answer))
+	}
 	return string(answer), nil
 }
 
-func (o Oracle) SpeechToText(ctx context.Context, speech io.Reader) (string, error) {
-	out := new(bytes.Buffer)
-	err := o.client.Transform(ctx, Transform{
-		Source: speech,
-		Target: out,
-	})
-	return out.String(), err
-}
-
-func (o Oracle) TextToSpeech(ctx context.Context, text string) (io.Reader, error) {
-	out := new(bytes.Buffer)
-	err := o.Transform(ctx, Transform{
-		Source: strings.NewReader(text),
-		Target: out,
-	})
-	return out, err
-}
-
 // Completion is a wrapper around the underlying Large Language Model API call.
-func (o Oracle) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+func (o Oracle) completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	return o.client.Completion(ctx, prompt)
-}
-
-func (o Oracle) Transform(ctx context.Context, transform Transform) error {
-	return o.client.Transform(ctx, transform)
 }
 
 // Reset clears the Oracle's previous chat history
@@ -217,109 +147,35 @@ func (o *Oracle) Reset() {
 	o.previousOutputs = []string{}
 }
 
-//----------------------------------------
-
-type Reference interface {
-	Describe() string
-}
-
-type Page interface {
-	GetContent() ([]byte, error)
-}
-
-const (
-	ReadOnlyReference  = "Page"
-	ReadWriteReference = "Artifact"
-)
-
-type References []Reference
-
-func (r References) AddTo(p *Prompt) {
-	for _, ref := range r {
-		switch ref.Describe() {
-		case ReadOnlyReference:
-			p.Pages = append(p.Pages, ref)
-		case ReadWriteReference:
-			p.Artifacts = append(p.Artifacts, ref)
+func Folder(root string) []byte {
+	contents := []byte{}
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
 		}
-	}
-}
-
-// ----------------------------------------
-
-type ImagePage struct {
-	Image image.Image
-}
-
-func (i ImagePage) Describe() string {
-	return ReadOnlyReference
-}
-func (i *ImagePage) GetContent() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, i.Image)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func NewVisuals(image image.Image, images ...image.Image) References {
-	refs := References{}
-	images = append(images, image)
-	for _, image := range images {
-		refs = append(refs, &ImagePage{Image: image})
-	}
-	return refs
-}
-
-// ----------------------------------------
-type DocumentPage struct {
-	contents io.Reader
-}
-
-func (d DocumentPage) Describe() string {
-	return ReadOnlyReference
-}
-func (i DocumentPage) GetContent() ([]byte, error) {
-	data, err := io.ReadAll(i.contents)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func NewDocuments(r io.Reader, a ...io.Reader) References {
-	refs := []Reference{}
-	a = append(a, r)
-	for _, doc := range a {
-		d, ok := doc.(io.Seeker)
-		if ok {
-			_, _ = d.Seek(0, io.SeekStart)
+		if info.IsDir() {
+			return nil
 		}
-		refs = append(refs, DocumentPage{contents: doc})
-	}
-	return refs
-}
-
-// ----------------------------------------
-
-type Artifact struct {
-	contents io.ReadWriter
-}
-
-func (a Artifact) Describe() string {
-	return ReadWriteReference
-}
-
-func NewArtifacts(artifact io.ReadWriter, a ...io.ReadWriter) References {
-	references := References{}
-	references = append(references, Artifact{
-		contents: artifact,
+		content := append(File(path), byte('\n'))
+		contents = append(contents, content...)
+		return nil
 	})
-	for _, artifact := range a {
-		references = append(references, Artifact{
-			contents: artifact,
-		})
+	return contents
+}
+
+func File(path string) []byte {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}
 	}
-	return references
+	return data
+}
+
+func Image(i image.Image) []byte {
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, i)
+	if err != nil {
+		return []byte{}
+	}
+	return buf.Bytes()
 }

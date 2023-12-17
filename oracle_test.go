@@ -1,76 +1,92 @@
-package oracle_test
+package goracle_test
 
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"image"
-	"image/png"
-	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
-	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mr-joshcrane/oracle"
-	"github.com/mr-joshcrane/oracle/client"
+	"github.com/mr-joshcrane/goracle"
+	"github.com/mr-joshcrane/goracle/client"
+	"golang.org/x/tools/cover"
 )
 
-func compareReaders(t *testing.T, x, y io.Reader) {
-	xBytes, err := io.ReadAll(x)
+func TestMain(m *testing.M) {
+	lastArg := os.Args[len(os.Args)-1]
+	if lastArg == "ALL" {
+		os.Exit(m.Run())
+	}
+	path := os.TempDir() + "/coverage.out"
+	f, err := os.Create(path)
 	if err != nil {
-		t.Fatalf("Error reading reference X: %s", err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	yBytes, err := io.ReadAll(y)
+	coverProfile := fmt.Sprintf("-coverprofile=%s", path)
+	tags := []string{"test", "-coverpkg=./...", "./...", coverProfile, "-args", "ALL"}
+	if lastArg == "--integration" {
+		tags = []string{"test", "-coverpkg=./...", "./...", "--tags=integration", coverProfile, "-args", "ALL"}
+	}
+	cmd := exec.Command("go", tags...)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Error reading reference Y: %s", err)
+		fmt.Println(string(out))
+		f.Close()
+		os.Exit(1)
 	}
-	if !bytes.Equal(xBytes, yBytes) {
-		t.Fatalf("Expected %s, got %s", string(xBytes), string(yBytes))
+	if strings.Contains(string(out), "FAIL") {
+		fmt.Println(string(out))
 	}
+	profiles, err := cover.ParseProfiles(path)
+	if err != nil {
+		fmt.Println(err)
+		f.Close()
+		os.Exit(1)
+	}
+	var globalTested, globalTestable int
+	for _, profile := range profiles {
+		var tested, testable int
+		for _, block := range profile.Blocks {
+			lineCount := block.EndLine - block.StartLine
+			if block.NumStmt > 0 {
+				testable += lineCount
+			}
+			if block.Count > 0 && block.NumStmt > 0 {
+				tested += lineCount
+			}
+		}
+		percentageTested := float64(tested) / float64(testable) * 100
+		fmt.Printf("%.2f%% - %s\n", percentageTested, profile.FileName)
+		globalTested += tested
+		globalTestable += testable
+	}
+
+	percentageTested := float64(globalTested) / float64(globalTestable) * 100
+	fmt.Printf("\nOverall Coverage: %.2f%%\n", percentageTested)
+
+	if err != nil {
+		fmt.Println(err)
+		f.Close()
+		os.Exit(1)
+	}
+	f.Close()
+	os.Exit(0)
 }
 
 func ctx() context.Context {
 	return context.TODO()
 }
 
-func createTestOracle(fixedResponse string, err error) (*oracle.Oracle, *client.Dummy) {
+func createTestOracle(fixedResponse string, err error) (*goracle.Oracle, *client.Dummy) {
 	c := client.NewDummyClient(fixedResponse, err)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+	o := goracle.NewOracle(c)
 	o.SetPurpose("You are a test Oracle")
 	return o, c
-}
-
-func TestTextToSpeechWithTrivialTransformerReturnsItsInput(t *testing.T) {
-	t.Parallel()
-	o, _ := createTestOracle("Hello World", nil)
-	r, err := o.TextToSpeech(ctx(), "Hello World")
-	if err != nil {
-		t.Errorf("Error generating speech from text: %s", err)
-	}
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Errorf("Error reading speech: %s", err)
-	}
-	got := string(data)
-	if got != "Hello World" {
-		t.Errorf("Expected Hello World, got %s", string(data))
-	}
-}
-
-func TestSpeechToTextWithTrivialTransformerReturnsItsInput(t *testing.T) {
-	t.Parallel()
-	o, _ := createTestOracle("", nil)
-	reader := bytes.NewReader([]byte("Hello World"))
-	got, err := o.SpeechToText(ctx(), reader)
-	if err != nil {
-		t.Errorf("Error generating speech from text: %s", err)
-	}
-	if got != "Hello World" {
-		t.Errorf("Expected Hello World, got %s", got)
-	}
 }
 
 func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
@@ -83,7 +99,7 @@ func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
 	if got != "Hello World" {
 		t.Errorf("Expected Hello World, got %s", got)
 	}
-	want := oracle.Prompt{
+	want := goracle.Prompt{
 		Purpose:  "You are a test Oracle",
 		Question: "Hello World",
 	}
@@ -106,7 +122,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	want := oracle.Prompt{
+	want := goracle.Prompt{
 		InputHistory:  []string{},
 		OutputHistory: []string{},
 		Question:      "Hello World",
@@ -118,7 +134,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 
 func TestPromptAccessorMethods(t *testing.T) {
 	t.Parallel()
-	prompt := oracle.Prompt{
+	prompt := goracle.Prompt{
 		Purpose:       "You are a test Oracle",
 		Question:      "Hello World",
 		InputHistory:  []string{"Hello World"},
@@ -139,181 +155,157 @@ func TestPromptAccessorMethods(t *testing.T) {
 	}
 }
 
-func TestAskWithNewDocumentProvidesCorrectPrompt(t *testing.T) {
+func TestAskWithStringLiteralReferenceReturnsCorrectPrompt(t *testing.T) {
 	t.Parallel()
-	r := strings.NewReader("It's time to shine")
 	o, c := createTestOracle("", nil)
-	document := oracle.NewDocuments(r)
-	_, err := o.Ask(ctx(), "Hello World", document)
+	_, err := o.Ask(ctx(), "Hello World", "It's time to shine")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	readers, err := c.P.GetPages()
-	if err != nil {
-		t.Errorf("Error getting pages: %s", err)
+	got := c.P.GetReferences()
+	if len(got) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
-	if len(readers) != 1 {
-		t.Errorf("Expected 1 reference, got %d", len(readers))
+	if string(got[0]) != "It's time to shine" {
+		t.Errorf("Expected It's time to shine, got %s", string(got[0]))
 	}
-	compareReaders(t, readers[0], r)
 }
 
-func TestAskWithNewDocumentsProvidesCorrectPrompt(t *testing.T) {
+func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	r1 := strings.NewReader("It's time to shine")
-	r2 := strings.NewReader("It's time to shine again")
-	documents := oracle.NewDocuments(r1, r2)
-
-	_, err := o.Ask(ctx(), "Hello World", documents)
+	_, err := o.Ask(ctx(), "Hello World",
+		"It's time to shine",
+		"It's time to shine again",
+	)
 	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+		t.Fatalf("Error asking question: %s", err)
 	}
-	readers, err := c.P.GetPages()
-	if err != nil {
-		t.Errorf("Error getting pages: %s", err)
+	got := c.P.GetReferences()
+	if len(got) != 2 {
+		t.Errorf("Expected 2 references, got %d", len(got))
 	}
-	if len(readers) != 2 {
-		t.Errorf("Expected 2 references, got %d", len(readers))
+	if string(got[0]) != "It's time to shine" {
+		t.Errorf("Expected It's time to shine, got %s", string(got[0]))
 	}
-	compareReaders(t, readers[0], r1)
+	if string(got[1]) != "It's time to shine again" {
+		t.Errorf("Expected It's time to shine again, got %s", string(got[1]))
+	}
 }
 
-func TestAskWithNewVisualsProvidesCorrectPrompt(t *testing.T) {
+func TestAskWithBytesReferenceReturnsCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	visuals := oracle.NewVisuals(v)
-
-	_, err := o.Ask(ctx(), "Hello World", visuals)
+	_, err := o.Ask(ctx(), "Hello World?",
+		[]byte("It's time to shine"),
+	)
 	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+		t.Fatalf("Error asking question: %s", err)
 	}
-	readers, err := c.P.GetPages()
-	if err != nil {
-		t.Errorf("Error getting pages: %s", err)
+	got := c.P.GetReferences()
+	if len(got) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
-	if len(readers) != 1 {
-		t.Errorf("Expected 1 reference, got %d", len(readers))
+	if !bytes.Equal(got[0], []byte("It's time to shine")) {
+		t.Errorf("Expected It's time to shine, got %s", string(got[0]))
 	}
-	var want bytes.Buffer
-	err = png.Encode(&want, v)
-	if err != nil {
-		t.Errorf("Error encoding image: %s", err)
-	}
-	got := readers[0]
-	compareReaders(t, got, &want)
 }
 
-func TestAskWithNewArtifactProvidesCorrectPrompt(t *testing.T) {
+func TestAskWithImageReferenceProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	want := new(bytes.Buffer)
-	artifacts := oracle.NewArtifacts(want)
-
-	_, err := o.Ask(ctx(), "Please create an artifact", artifacts)
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	_, err := o.Ask(ctx(), "Whats in this image?", img)
 	if err != nil {
-		t.Errorf("Error asking question: %s", err)
+		t.Fatalf("Error asking question: %s", err)
 	}
-	art, err := c.P.GetArtifacts()
-	if err != nil {
-		t.Errorf("Error getting artifacts: %s", err)
+	got := c.P.GetReferences()
+	if len(got) != 1 {
+		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
-	if len(art) != 1 {
-		t.Errorf("Expected 1 artifact, got %d", len(artifacts))
-	}
-	got := art[0]
-	if got == nil {
-		t.Fatal("Expected artifact, got nil")
-	}
-	if got != want {
-		t.Fatalf("Artifact pointers do not match")
+	if !bytes.Equal(got[0], goracle.Image(img)) {
+		t.Errorf("Expected %v, got %v", goracle.Image(img), got[0])
 	}
 }
 
-func TestImageRefCanBeRead(t *testing.T) {
+func TestAskWithSomeUnknownReferenceReturnsError(t *testing.T) {
 	t.Parallel()
-	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	page := oracle.ImagePage{
-		Image: v,
-	}
-
-	got, err := page.GetContent()
-	if err != nil {
-		t.Errorf("Error reading image: %s", err)
-	}
-	if len(got) != 298 {
-		t.Errorf("Expected 40000 bytes, got %d", len(got))
+	o, _ := createTestOracle("", nil)
+	type Unsupported struct{}
+	_, err := o.Ask(ctx(), "Whats in this image?", Unsupported{})
+	if err == nil {
+		t.Fatalf("Expected error asking question, got nil")
 	}
 }
 
-func TestAskWithNewArtifactsCanProvideCorrectPrompt(t *testing.T) {
+func TestFileReference_ValidFileReturnsByteContents(t *testing.T) {
 	t.Parallel()
-	o, c := createTestOracle("", nil)
-	buf1 := new(bytes.Buffer)
-	buf2 := new(bytes.Buffer)
-	artifacts := oracle.NewArtifacts(buf1, buf2)
-	_, err := o.Ask(ctx(), "Please create two artifacts", artifacts)
-	if err != nil {
-		t.Errorf("Error asking question: %s", err)
-	}
-	art, err := c.P.GetArtifacts()
-	if err != nil {
-		t.Errorf("Error getting artifacts: %s", err)
-	}
-	if len(art) != 2 {
-		t.Errorf("Expected 2 artifacts, got %d", len(art))
-	}
-	if art[0] != buf1 {
-		t.Errorf("Expected artifact 1 to be buf1")
-	}
-	if art[1] != buf2 {
-		t.Errorf("Expected artifact 2 to be buf2")
-	}
-}
-
-func TestPromptWithGetArtifactsProvidesCorrectPrompt(t *testing.T) {
-	t.Parallel()
-	buf1 := bytes.NewBufferString("It's time to shine")
-	buf2 := bytes.NewBufferString("It's time to shine again")
-	prompt := oracle.Prompt{
-		Purpose:   "You are a test Oracle",
-		Question:  "Please create two artifacts",
-		Artifacts: oracle.NewArtifacts(buf1, buf2),
-	}
-	artifacts, _ := prompt.GetArtifacts()
-	if len(artifacts) != 2 {
-		t.Errorf("Expected 2 artifacts, got %d", len(artifacts))
-	}
-	if artifacts[0] != buf1 {
-		t.Errorf("Expected artifact 1 to be buf1")
-	}
-	if artifacts[1] != buf2 {
-		t.Errorf("Expected artifact 2 to be buf2")
-	}
-}
-
-func TestPromptWithFaultyReferencesGivesErrorFeedback(t *testing.T) {
-	t.Parallel()
-	badReader := iotest.ErrReader(errors.New("Error reading page"))
-	badWriter, err := os.CreateTemp("", "oracle_test")
+	want := []byte("cheese is made from milk")
+	path := t.TempDir() + "/text.txt"
+	err := os.WriteFile(path, want, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
-	badWriter.Close()
-	prompt := oracle.Prompt{
-		Purpose:   "You are a test Oracle",
-		Question:  "Please create two artifacts",
-		Pages:     oracle.NewDocuments(badReader),
-		Artifacts: oracle.NewArtifacts(badWriter),
+	got := goracle.File(path)
+	if !bytes.Equal(got, want) {
+		t.Errorf("Expected %s, got %s", string(want), string(got))
 	}
-	_, err = prompt.GetArtifacts()
-	if err == nil {
-		t.Errorf("Expected error reading artifacts, got %v", err)
+}
+
+func TestFileReference_InvalidFileReturnsEmptyBytes(t *testing.T) {
+	t.Parallel()
+	got := goracle.File("invalid/path")
+	if len(got) != 0 {
+		t.Errorf("Expected empty bytes, got %s", string(got))
 	}
-	_, err = prompt.GetPages()
-	if err == nil {
-		t.Errorf("Expected error reading pages, got %v", err)
+}
+
+func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
+	t.Parallel()
+	content1 := []byte("cheese is made from milk")
+	content2 := []byte("the sky is blue")
+	dir := t.TempDir()
+	err := os.WriteFile(dir+"/text1.txt", content1, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(dir+"/text2.txt", content2, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := goracle.Folder(dir)
+	want := []byte("cheese is made from milk\nthe sky is blue\n")
+	if !cmp.Equal(got, want) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
+	t.Parallel()
+	got := goracle.Folder("invalid/path")
+	if len(got) != 0 {
+		t.Errorf("Expected empty bytes, got %s", string(got))
+	}
+}
+
+func TestImageReference_ValidImageReturnsPNGEncodingasBytes(t *testing.T) {
+	t.Parallel()
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	got := goracle.Image(img)
+	want := []byte{137, 80, 78, 71, 13, 10, 26, 10}
+	if !bytes.Equal(got[:8], want) {
+		t.Errorf("Expected %v, got %v", want, got[:8])
+	}
+}
+
+func TestImageReference_InvalidImageReturnsPNGEncodingasBytes(t *testing.T) {
+	t.Parallel()
+	img := image.NewRGBA64(image.Rect(0, 0, 100, 100))
+	img.Rect = image.Rect(0, 0, 0, -1)
+	got := goracle.Image(img)
+	want := []byte{}
+	if !bytes.Equal(got, want) {
+		t.Errorf("Expected %v, got %v", want, got[:8])
 	}
 }
 
@@ -322,7 +314,7 @@ func TestPromptWithFaultyReferencesGivesErrorFeedback(t *testing.T) {
 func ExampleOracle_Ask_standardTextCompletion() {
 	// Basic request response text flow
 	c := client.NewDummyClient("A friendly LLM response!", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 	answer, err := o.Ask(ctx, "A user question")
 	if err != nil {
@@ -332,97 +324,80 @@ func ExampleOracle_Ask_standardTextCompletion() {
 	// Output: A friendly LLM response!
 }
 
-func ExampleOracle_Ask_visualsToText() {
-	// Text request with reference to an [image.Image]
-	c := client.NewDummyClient("This is a black square!", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+func ExampleOracle_Ask_withReferences() {
+	// Basic request response text flow with multi-modal references
+	c := client.NewDummyClient("Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt", nil)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
-
-	v := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	visuals := oracle.NewVisuals(v)
-	answer, err := o.Ask(ctx, "What color and shape is this image?", visuals)
+	nonCheeseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	answer, err := o.Ask(ctx,
+		"My question for you is, do any of my references make mention of swiss cheese?",
+		"Some long chunk of text, that is notably non related",
+		goracle.File("invoice.txt"),
+		nonCheeseImage,
+		goracle.Folder("~/cheeseDocs/"),
+	)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(answer)
-	// Output: This is a black square!
+	// Output: Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt
 }
 
-func ExampleOracle_Ask_textToImage() {
-	// Request an image based on a text prompt
-	// Requires an [Artifact] to write the image to
-	c := client.NewDummyClient("I drew you an image!", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+func ExampleOracle_Ask_withExamples() {
+	// Examples allow you to guide the LLM with n-shot learning
+	c := client.NewDummyClient("42", nil)
+	o := goracle.NewOracle(c)
+	o.GiveExample("Fear is the...", "mind killer")
+	o.GiveExample("With great power comes...", "great responsibility")
 	ctx := context.Background()
-
-	buf := new(bytes.Buffer)
-	artifacts := oracle.NewArtifacts(buf)
-	answer, err := o.Ask(ctx, "Please create a simple red square on a black background, nothing else", artifacts)
+	answer, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(answer)
-	// Output: I drew you an image!
+	// Output: 42
 }
 
-func ExampleOracle_Transform_textToSpeech() {
-	// Transform text to audio
-	// Requires a [strings.Reader] as the source
-	// Returns an [io.Reader] as the target
-	c := client.NewDummyClient("", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+func ExampleOracle_Ask_withConversationMemory() {
+	// For when you want the responses to be Stateful
+	// and depend on the previous answers
+	// this is the default and matches the typical chatbot experience
+	c := client.NewDummyClient("We talked about the answer to life, the universe, and everything", nil)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 
-	speech, err := o.TextToSpeech(ctx, "Hello, world!")
+	// This is the default, but can be set manually
+	goracle.Stateful(o)
+	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
 	}
-	data, err := io.ReadAll(speech)
-	if err != nil {
-		panic(err)
-	}
-	_ = os.WriteFile("hello_world.wav", data, 0644)
-}
-
-func ExampleOracle_Transform_speechToText() {
-	// Transform audio to text
-	// Requires an [io.Reader] as the source
-	// Returns a [string] as the target
-	c := client.NewDummyClient("A transcript of your audio data", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
-	ctx := context.Background()
-
-	// In reality, this will be some reader containing audio data
-	r := bytes.NewReader([]byte(c.FixedResponse))
-	answer, err := o.SpeechToText(ctx, r)
+	answer, err := o.Ask(ctx, "What have we already talked about?")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(answer)
-	// Output: A transcript of your audio data
+	// Output: We talked about the answer to life, the universe, and everything
 }
 
-func ExampleOracle_Ask_chainCalls() {
-	// Single API calls are great, but chaining them together is where the magic happens
-	c := client.NewDummyClient("A response!", nil)
-	o := oracle.NewOracle("", oracle.WithClient(c))
+func ExampleOracle_Ask_withoutConversationMemory() {
+	// For when you want the responses to be Stateless
+	// and not depend on the previous answers/examples
+	c := client.NewDummyClient("Nothing so far", nil)
+	o := goracle.NewOracle(c)
 	ctx := context.Background()
 
 	//
-
-	name, _ := o.Ask(ctx, "I'm of opening a coffee shop. I want it to be Tucan themed. What are some ideas for branding and names?")
-	fmt.Println(name)
-	notes := oracle.NewDocuments(strings.NewReader("Brand notes: Bright colored, hipster, retro geek chic"))
-	theme, _ := o.Ask(ctx, "What should the theme be? Whats my gimmick? Work with my existing notes", notes)
-	fmt.Println(theme)
-	// In reality, we would use real images for inspiration
-	inspirations := oracle.NewVisuals(image.Image(nil), image.Image(nil))
-	prompt, _ := o.Ask(ctx,
-		"Given what we've talked about, create an LLM prompt that would create a logo for my coffee shop. Take inspiration from these photos",
-		inspirations,
-	)
-
-	f, _ := os.Create("logo.png")
-	logo := oracle.NewArtifacts(f)
-	o.Ask(ctx, prompt, logo)
+	goracle.Stateless(o)
+	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	if err != nil {
+		panic(err)
+	}
+	answer, err := o.Ask(ctx, "What have we already talked about?")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: Nothing so far
 }

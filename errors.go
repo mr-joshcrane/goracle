@@ -1,17 +1,15 @@
-package oracle
+package goracle
 
-import (
-	"github.com/mr-joshcrane/oracle/client"
-)
+import "github.com/mr-joshcrane/goracle/client/openai"
 
 type ClientError struct {
-	client.ClientError
+	openai.ClientError
 }
 
 type RateLimitError struct {
-	client.RateLimitError
+	openai.RateLimitError
 }
 
 type BadRequestError struct {
-	client.BadRequestError
+	openai.BadRequestError
 }
