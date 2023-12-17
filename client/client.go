@@ -14,7 +14,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetPages() [][]byte
+	GetReferences() [][]byte
 }
 
 // --- Dummy Client

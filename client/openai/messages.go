@@ -17,7 +17,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetPages() [][]byte
+	GetReferences() [][]byte
 }
 
 type Messages []Message
@@ -56,11 +56,11 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		Role:    RoleUser,
 		Content: prompt.GetQuestion(),
 	})
-	pages := prompt.GetPages()
-	for i, page := range pages {
+	refs := prompt.GetReferences()
+	for i, ref := range refs {
 		i++
-		if isPNG(page) {
-			uri := ConvertPNGToDataURI(page)
+		if isPNG(ref) {
+			uri := ConvertPNGToDataURI(ref)
 			messages = append(messages, VisionMessage{
 				Role: RoleUser,
 				Content: []VisionImageURL{
@@ -77,7 +77,7 @@ func MessageFromPrompt(prompt Prompt) Messages {
 		}
 		messages = append(messages, TextMessage{
 			Role:    RoleUser,
-			Content: fmt.Sprintf("Reference %d: %s", i, page),
+			Content: fmt.Sprintf("Reference %d: %s", i, ref),
 		})
 	}
 	return messages
@@ -85,9 +85,9 @@ func MessageFromPrompt(prompt Prompt) Messages {
 
 func Do(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
 	strategy := textCompletion
-	pages := prompt.GetPages()
-	for _, page := range pages {
-		if isPNG(page) {
+	refs := prompt.GetReferences()
+	for _, ref := range refs {
+		if isPNG(ref) {
 			strategy = visionCompletion
 		}
 	}

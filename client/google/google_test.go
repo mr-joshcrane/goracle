@@ -11,7 +11,7 @@ func testPrompt() oracle.Prompt {
 		InputHistory:  []string{"GivenInput", "GivenInput2"},
 		OutputHistory: []string{"IdealOutput", "IdealOutput2"},
 		Question:      "A test question",
-		Pages:         [][]byte{[]byte("page1"), []byte("page2")},
+		References:    [][]byte{[]byte("page1"), []byte("page2")},
 	}
 }
 

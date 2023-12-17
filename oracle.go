@@ -14,12 +14,13 @@ import (
 )
 
 // Prompt is a struct that scaffolds a well formed prompt, designed in a way
-// that are ideal for Large Language Models.
+// that are ideal for Large Language Models. This is the abstraction we will pass
+// through to the client library so it can be handled appropriately
 type Prompt struct {
 	Purpose       string
 	InputHistory  []string
 	OutputHistory []string
-	Pages         [][]byte
+	References    [][]byte
 	Question      string
 }
 
@@ -39,8 +40,8 @@ func (p Prompt) GetQuestion() string {
 	return p.Question
 }
 
-func (p Prompt) GetPages() [][]byte {
-	return p.Pages
+func (p Prompt) GetReferences() [][]byte {
+	return p.References
 }
 
 // LanguageModel is an interface that abstracts a concrete implementation of our
@@ -57,16 +58,32 @@ type Oracle struct {
 	previousInputs  []string
 	previousOutputs []string
 	client          LanguageModel
+	stateful        bool
 }
 
 // Options is a function that modifies the Oracle.
 type Option func(*Oracle) *Oracle
 
+func Stateful(*Oracle) *Oracle {
+	return &Oracle{
+		stateful: true,
+	}
+}
+
+func Stateless(*Oracle) *Oracle {
+	return &Oracle{
+		previousInputs:  []string{},
+		previousOutputs: []string{},
+		stateful:        false,
+	}
+}
+
 // NewOracle returns a new Oracle with sensible defaults.
 func NewOracle(client LanguageModel) *Oracle {
 	return &Oracle{
-		client:  client,
-		purpose: "You are a helpful assistant",
+		client:   client,
+		purpose:  "You are a helpful assistant",
+		stateful: true,
 	}
 }
 
@@ -84,7 +101,7 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model.
-func (o Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
+func (o *Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
@@ -94,11 +111,11 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 	for _, reference := range references {
 		switch r := reference.(type) {
 		case []byte:
-			p.Pages = append(p.Pages, r)
+			p.References = append(p.References, r)
 		case string:
-			p.Pages = append(p.Pages, []byte(r))
+			p.References = append(p.References, []byte(r))
 		case image.Image:
-			p.Pages = append(p.Pages, Image(r))
+			p.References = append(p.References, Image(r))
 		default:
 			return "", fmt.Errorf("unprocessable reference type: %T", r)
 		}
@@ -110,6 +127,9 @@ func (o Oracle) Ask(ctx context.Context, question string, references ...any) (st
 	answer, err := io.ReadAll(data)
 	if err != nil {
 		return "", err
+	}
+	if o.stateful {
+		o.GiveExample(question, string(answer))
 	}
 	return string(answer), nil
 }

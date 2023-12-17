@@ -159,7 +159,7 @@ func TestAskWithStringLiteralReferenceReturnsCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
-	got := c.P.GetPages()
+	got := c.P.GetReferences()
 	if len(got) != 1 {
 		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
@@ -178,7 +178,7 @@ func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error asking question: %s", err)
 	}
-	got := c.P.GetPages()
+	got := c.P.GetReferences()
 	if len(got) != 2 {
 		t.Errorf("Expected 2 references, got %d", len(got))
 	}
@@ -199,7 +199,7 @@ func TestAskWithBytesReferenceReturnsCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error asking question: %s", err)
 	}
-	got := c.P.GetPages()
+	got := c.P.GetReferences()
 	if len(got) != 1 {
 		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
@@ -216,7 +216,7 @@ func TestAskWithImageReferenceProvidesCorrectPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error asking question: %s", err)
 	}
-	got := c.P.GetPages()
+	got := c.P.GetReferences()
 	if len(got) != 1 {
 		t.Errorf("Expected 1 reference, got %d", len(got))
 	}
@@ -319,4 +319,82 @@ func ExampleOracle_Ask_standardTextCompletion() {
 	}
 	fmt.Println(answer)
 	// Output: A friendly LLM response!
+}
+
+func ExampleOracle_Ask_withReferences() {
+	// Basic request response text flow with multi-modal references
+	c := client.NewDummyClient("Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt", nil)
+	o := oracle.NewOracle(c)
+	ctx := context.Background()
+	nonCheeseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	answer, err := o.Ask(ctx,
+		"My question for you is, do any of my references make mention of swiss cheese?",
+		"Some long chunk of text, that is notably non related",
+		oracle.File("invoice.txt"),
+		nonCheeseImage,
+		oracle.Folder("~/cheeseDocs/"),
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt
+}
+
+func ExampleOracle_Ask_withExamples() {
+	// Examples allow you to guide the LLM with n-shot learning
+	c := client.NewDummyClient("42", nil)
+	o := oracle.NewOracle(c)
+	o.GiveExample("Fear is the...", "mind killer")
+	o.GiveExample("With great power comes...", "great responsibility")
+	ctx := context.Background()
+	answer, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: 42
+}
+
+func ExampleOracle_Ask_withConversationMemory() {
+	// For when you want the responses to be Stateful
+	// and depend on the previous answers
+	// this is the default and matches the typical chatbot experience
+	c := client.NewDummyClient("We talked about the answer to life, the universe, and everything", nil)
+	o := oracle.NewOracle(c)
+	ctx := context.Background()
+
+	// This is the default, but can be set manually
+	oracle.Stateful(o)
+	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	if err != nil {
+		panic(err)
+	}
+	answer, err := o.Ask(ctx, "What have we already talked about?")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: We talked about the answer to life, the universe, and everything
+}
+
+func ExampleOracle_Ask_withoutConversationMemory() {
+	// For when you want the responses to be Stateless
+	// and not depend on the previous answers/examples
+	c := client.NewDummyClient("Nothing so far", nil)
+	o := oracle.NewOracle(c)
+	ctx := context.Background()
+
+	//
+	oracle.Stateless(o)
+	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	if err != nil {
+		panic(err)
+	}
+	answer, err := o.Ask(ctx, "What have we already talked about?")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: Nothing so far
 }

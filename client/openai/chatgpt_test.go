@@ -28,7 +28,7 @@ func testPrompt() oracle.Prompt {
 		InputHistory:  []string{"GivenInput", "GivenInput2"},
 		OutputHistory: []string{"IdealOutput", "IdealOutput2"},
 		Question:      "A test question",
-		Pages:         [][]byte{[]byte("page1"), []byte("page2")},
+		References:    [][]byte{[]byte("page1"), []byte("page2")},
 	}
 }
 
@@ -155,7 +155,7 @@ func TestMessageFromPromptWithImages(t *testing.T) {
 		t.Errorf("Error encoding test image: %s", err)
 	}
 	prompt := oracle.Prompt{
-		Pages: [][]byte{buf.Bytes()},
+		References: [][]byte{buf.Bytes()},
 	}
 	messages := openai.MessageFromPrompt(prompt)
 	if len(messages) != 3 {

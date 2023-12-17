@@ -23,7 +23,7 @@ type Prompt interface {
 	GetPurpose() string
 	GetHistory() ([]string, []string)
 	GetQuestion() string
-	GetPages() [][]byte
+	GetReferences() [][]byte
 }
 
 type ChatMessage struct {
@@ -76,17 +76,17 @@ func MessagesFromPrompt(prompt Prompt) []ChatMessage {
 			Parts: MessagePart{Text: idealOutputs[i]},
 		})
 	}
-	for i, page := range prompt.GetPages() {
-		if isPNG(page) {
+	for i, ref := range prompt.GetReferences() {
+		if isPNG(ref) {
 			messages = append(messages, ChatMessage{
 				Role:  User,
-				Parts: MessagePart{Text: string(page)},
+				Parts: MessagePart{Text: string(ref)},
 			})
 			continue
 		}
 		messages = append(messages, ChatMessage{
 			Role:  User,
-			Parts: MessagePart{Text: fmt.Sprintf("SYSTEM: USER PROVIDED FILE %d: %s", i+1, string(page))},
+			Parts: MessagePart{Text: fmt.Sprintf("SYSTEM: USER PROVIDED FILE %d: %s", i+1, string(ref))},
 		})
 		messages = append(messages, ChatMessage{
 			Role:  Bot,
