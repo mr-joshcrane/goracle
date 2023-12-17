@@ -1,116 +1,72 @@
-```markdown
-# Oracle - Advanced Go Library for LLM Abstraction
+# GOracle - A User-Friendly Go Library for LLMs
 
-## Introduction
-Oracle is a Go library designed to streamline interactions with large language models (LLMs) by providing a unified API layer for different services.
+## Overview
 
-Supported clients:
-- OpenAI's GPT
-- Google's VertexAI models (including Gemini)
+GOracle is a user-friendly convenience library designed to facilitate the interaction with Large Language Models (LLMs) for developers integrating these models into Go applications. Our goal is to provide a straightforward and efficient experience for Go developers by offering a common API layer that abstracts the complexities of various LLM platforms.
 
-## Core Features
-- Unified API layer for LLMs.
-- Consistent interactions with OpenAI and VertexAI.
+In fact, this README was ghost written by an LLM, with a lot of oversight from his human editor.
+Check out the [code here](github.com/mr-joshcrane/oracle/examples/readme/main.go)! 
 
-## Supported Clients
-- Modular design for composability.
-- The library defines a 'Prompt' struct that allows for versatile request generation, supporting text and image data.
+## Features
 
-## Prerequisites
-- Installation of Go.
-- Required OpenAI and VertexAI API keys and VertexAI project ID.
+- Simple interaction with LLMs from Go applications.
+- Compatibility with multiple large language models such as OpenAI's GPT and Google's VertexAI.
+- Support for diverse types of reference materials (text, images, and files).
+- State management features for sustained conversations and context control.
+- Extensible design for adding new LLM providers in the future.
 
-## Installation and Setup
+## The Ask Method
 
-Install the library:
+The `Ask` method is the core function of GOracle. It allows developers to pose questions to an LLM and receive a response. This method takes a question as a string input and optional reference arguments. These references can be used to provide additional context to the LLM in various forms such as text, images, or file content.
 
-```sh
-go get github.com/mr-joshcrane/oracle
-```
-
-Configure the required environment variables:
-
-For OpenAI:
-
-```sh
-export OPENAI_API_KEY='your_api_key_here'
-```
-
-For Google Cloud, be sure to have set up your authentication with the `gcloud`
-CLI in your environment. If you can get a valid token with the below command, you should be in
-business.
-
-```sh
-## Should return an access token
-gcloud auth --print-access-token
-## Should return your GCP ProjectID
-gcloud config get-value project
-```
-
-## Usage
-
-Initialize Oracle with OpenAI's GPT:
+### Usage Example
 
 ```go
-package main
+ctx := context.Background()
+c := client.NewChatGPT("your-token-here")
+o := oracle.NewOracle(c)
+response, err := o(ctx, "What is the capital of France?")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(response)
+// Response: Paris!
+```
 
-import (
-    "context"
-    "fmt"
-    "os"
-    "github.com/mr-joshcrane/oracle/client"
-    "github.com/mr-joshcrane/oracle"
+## Reference Concept
+
+A reference in GOracle provides context to the LLM to assist with generating an accurate and relevant response. References can be text excerpts, image data, or file contents that inform the LLM about the context or domain of the question being asked.
+
+### Supported Types
+
+- Textual content as strings or bytes.
+- Images represented in Go's `image.Image` interface.
+- File content using byte slices with file-reader functionality.
+
+### Using References
+
+References can enhance the quality of the LLM's responses by providing relevant examples or additional data. You can include references when using the `Ask` method.
+
+### Reference Usage Example
+
+```go
+ctx := context.Background()
+imageRef := // ... some image.Image object
+fileRef := oracle.File("example.txt")
+stringRef := "some big mess of text"
+
+response, err := oracleInstance.Ask(ctx, 
+    "Can you analyze the content of these references?", 
+    imageRef, 
+    fileRef,
+    stringRef,
 )
-
-func openAIOracle() {
-    ctx := context.Background()
-    openaiToken := os.Getenv("OPENAI_API_KEY")
-    c := client.NewChatGPT(openaiToken)
-    o := oracle.NewOracle(c)
-    response, err := o.Ask(ctx, "Are you from OpenAI or Google?")
-    if err != nil {
-        fmt.Println("Error:", err)
-        return
-    }
-
-    fmt.Println(response)
-    // Sample Response: I am an AI developed by OpenAI, not Google. 
+if err != nil {
+    log.Fatal(err)
 }
-
-func googleGeminiOracle() {
-    ctx := context.Background()
-    c := client.NewVertex()
-    o := oracle.NewOracle(c)
-    response, err := o.Ask(ctx, "Are you from OpenAI or Google?")
-    if err != nil {
-        fmt.Println("Error:", err)
-        return
-    }
-
-    fmt.Println(response)
-    // Sample Response: I am a large language model, trained by Google.
-}
+fmt.Println(response)
 ```
 
-Run Tests:
-The `oracle_test.go` MainTest function has been modified to run all subtests
-collecting coverage information. To run them...
+Please note that GOracle only serves as a convenience tool for LLM integrations and does not include the actual language models. Users are required to have proper access to the LLM platforms (like OpenAI or Google Cloud's VertexAI) with necessary API keys or tokens configured.
 
-```sh
-# For unit tests only and file coverage
-go test 
-# Include integration tests
-go test --integration
-```
-
-## Contributing
-We appreciate contributions. To contribute:
-- Include tests for new features.
-- Pass all the tests before submitting a PR.
-- Clearly describe changes in your PR.
-Feedback, especially on documentation, is highly valued.
-
-## Licensing and Support
-The project is under the MIT License. For support, submit inquiries through our [issues tracker](https://github.com/mr-joshcrane/oracle/issues), providing detailed context for quicker resolution.
-
-*Oracle is third-party software and not officially affiliated with OpenAI or Google Cloud.*
+We hope GOracle empowers you to build out your Golang applications with the powerful capabilities of LLMs, bringing complex language understanding and generation features to your user base. Enjoy the simplified experience of using LLMs in your next project!

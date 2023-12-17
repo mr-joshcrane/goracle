@@ -241,8 +241,8 @@ func CreateVertexTextCompletionRequest(token string, projectID string, messages 
 	body := TextCompletionRequest{
 		Contents: messages,
 		GenerationConfig: GenerationConfig{
-			MaxOutputTokens: 1024,
-			Temperature:     0.0,
+			MaxOutputTokens: 8192,
+			Temperature:     0.9,
 			TopP:            0.8,
 			TopK:            40,
 		},
@@ -266,6 +266,7 @@ func ParseVertexTextCompletionResponse(resp http.Response) (io.Reader, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
+
 	defer resp.Body.Close()
 	body := []struct {
 		Candidates []struct {
@@ -284,9 +285,13 @@ func ParseVertexTextCompletionResponse(resp http.Response) (io.Reader, error) {
 	if len(body) < 1 {
 		return nil, fmt.Errorf("no predictions returned")
 	}
+
 	var answer string
 	for _, candidate := range body {
 		for _, content := range candidate.Candidates {
+			if len(content.Content.Parts) < 1 {
+				continue
+			}
 			answer += content.Content.Parts[0].Text
 		}
 	}
