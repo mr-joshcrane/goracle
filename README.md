@@ -13,11 +13,8 @@ Supported clients:
 - Consistent interactions with OpenAI and VertexAI.
 
 ## Supported Clients
-- Modular design for scalability.
+- Modular design for composability.
 - The library defines a 'Prompt' struct that allows for versatile request generation, supporting text and image data.
-
-## Error Handling
-- Handles common errors and service-specific issues such as rate limiting and invalid requests.
 
 ## Prerequisites
 - Installation of Go.
@@ -40,11 +37,14 @@ export OPENAI_API_KEY='your_api_key_here'
 ```
 
 For Google Cloud, be sure to have set up your authentication with the `gcloud`
-CLI. If you can get a valid token with the below command, you should be in
+CLI in your environment. If you can get a valid token with the below command, you should be in
 business.
 
 ```sh
+## Should return an access token
 gcloud auth --print-access-token
+## Should return your GCP ProjectID
+gcloud config get-value project
 ```
 
 ## Usage
@@ -58,24 +58,39 @@ import (
     "context"
     "fmt"
     "os"
+    "github.com/mr-joshcrane/oracle/client"
     "github.com/mr-joshcrane/oracle"
 )
 
-func main() {
+func openAIOracle() {
     ctx := context.Background()
     openaiToken := os.Getenv("OPENAI_API_KEY")
-    c := oracle.NewOracle(openaiToken)
-    response, err := oracleGPT.Ask(ctx, "Sample query for GPT.")
+    c := client.NewChatGPT(openaiToken)
+    o := oracle.NewOracle(c)
+    response, err := o.Ask(ctx, "Are you from OpenAI or Google?")
     if err != nil {
         fmt.Println("Error:", err)
         return
     }
 
     fmt.Println(response)
+    // Sample Response: I am an AI developed by OpenAI, not Google. 
+}
+
+func googleGeminiOracle() {
+    ctx := context.Background()
+    c := client.NewVertex()
+    o := oracle.NewOracle(c)
+    response, err := o.Ask(ctx, "Are you from OpenAI or Google?")
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+
+    fmt.Println(response)
+    // Sample Response: I am a large language model, trained by Google.
 }
 ```
-
-To switch to VertexAI, initialize with VertexAI's client configuration.
 
 Run Tests:
 The `oracle_test.go` MainTest function has been modified to run all subtests
@@ -99,5 +114,3 @@ Feedback, especially on documentation, is highly valued.
 The project is under the MIT License. For support, submit inquiries through our [issues tracker](https://github.com/mr-joshcrane/oracle/issues), providing detailed context for quicker resolution.
 
 *Oracle is third-party software and not officially affiliated with OpenAI or Google Cloud.*
-```
-This README removes overly descriptive language aligning with critique reference 1 and corrects inaccuracies and clarifies ambiguity as per points laid out in critique reference 3.
