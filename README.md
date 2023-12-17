@@ -1,6 +1,6 @@
 # GOracle - A User-Friendly Go Library for LLMs
 
-![A confused Golang Gopher with a Crystal Ball](.github/goracle.png)
+<img src=".github/goracle.png" width="400" />
 
 ## Overview
 
