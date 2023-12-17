@@ -1,5 +1,7 @@
 # GOracle - A User-Friendly Go Library for LLMs
 
+![A confused Golang Gopher with a Crystal Ball](.github/goracle.png)
+
 ## Overview
 
 GOracle is a convenience library designed to help Golang developers bring the power of (LLMs) into their Go applications. Our goal is to provide a straightforward and efficient experience for Go developers by offering a common API layer that abstracts the complexities of various LLM platforms down into the client layer, while providing a small stable interface.
@@ -71,6 +73,6 @@ fmt.Println(response)
 
 Please note that GOracle only serves as a convenience tool for LLM integrations and does not include the actual language models. Users are required to have proper access to the LLM platforms (like OpenAI or Google Cloud's VertexAI) with necessary API keys or tokens configured.
 
-**Users should also be aware that Oracle has no awareness of billing, so in the interests of your hip pocket, set the appropriate hard caps or limits on spending!**
+**Users should also be aware that GOracle has no awareness of billing, so in the interests of your hip pocket, set the appropriate hard caps or limits on spending!**
 
 We hope GOracle empowers you to build out your Golang applications with the powerful capabilities of LLMs, bringing complex language understanding and generation features to your user base. Enjoy the simplified experience of using LLMs in your next project!

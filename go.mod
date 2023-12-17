@@ -1,4 +1,4 @@
-module github.com/mr-joshcrane/oracle
+module github.com/mr-joshcrane/goracle
 
 go 1.21
 

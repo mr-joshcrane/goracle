@@ -1,4 +1,4 @@
-package oracle_test
+package goracle_test
 
 import (
 	"bytes"
