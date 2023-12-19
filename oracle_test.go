@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/goracle"
@@ -78,10 +79,6 @@ func TestMain(m *testing.M) {
 	os.Exit(0)
 }
 
-func ctx() context.Context {
-	return context.TODO()
-}
-
 func createTestOracle(fixedResponse string, err error) (*goracle.Oracle, *client.Dummy) {
 	c := client.NewDummyClient(fixedResponse, err)
 	o := goracle.NewOracle(c)
@@ -92,7 +89,7 @@ func createTestOracle(fixedResponse string, err error) (*goracle.Oracle, *client
 func TestAsk_ProvidesWellFormedPromptToLLM(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("Hello World", nil)
-	got, err := o.Ask(ctx(), "Hello World")
+	got, err := o.Ask("Hello World")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -113,12 +110,12 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 	o, c := createTestOracle("Hello World", nil)
 	o.GiveExample("An example that should be forgotten", "And the ideal response that should be forgotten")
 	o.SetPurpose("Setting a purpose that should NOT be forgotten")
-	_, err := o.Ask(ctx(), "A question that should be forgotten")
+	_, err := o.Ask("A question that should be forgotten")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
 	o.Reset()
-	_, err = o.Ask(ctx(), "Hello World")
+	_, err = o.Ask("Hello World")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -159,7 +156,7 @@ func TestPromptAccessorMethods(t *testing.T) {
 func TestAskWithStringLiteralReferenceReturnsCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	_, err := o.Ask(ctx(), "Hello World", "It's time to shine")
+	_, err := o.Ask("Hello World", "It's time to shine")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
 	}
@@ -175,7 +172,7 @@ func TestAskWithStringLiteralReferenceReturnsCorrectPrompt(t *testing.T) {
 func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	_, err := o.Ask(ctx(), "Hello World",
+	_, err := o.Ask("Hello World",
 		"It's time to shine",
 		"It's time to shine again",
 	)
@@ -197,7 +194,7 @@ func TestAskWithStringLiteralReferneceProvidesCorrectPrompt(t *testing.T) {
 func TestAskWithBytesReferenceReturnsCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
-	_, err := o.Ask(ctx(), "Hello World?",
+	_, err := o.Ask("Hello World?",
 		[]byte("It's time to shine"),
 	)
 	if err != nil {
@@ -216,7 +213,7 @@ func TestAskWithImageReferenceProvidesCorrectPrompt(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("", nil)
 	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	_, err := o.Ask(ctx(), "Whats in this image?", img)
+	_, err := o.Ask("Whats in this image?", img)
 	if err != nil {
 		t.Fatalf("Error asking question: %s", err)
 	}
@@ -233,7 +230,7 @@ func TestAskWithSomeUnknownReferenceReturnsError(t *testing.T) {
 	t.Parallel()
 	o, _ := createTestOracle("", nil)
 	type Unsupported struct{}
-	_, err := o.Ask(ctx(), "Whats in this image?", Unsupported{})
+	_, err := o.Ask("Whats in this image?", Unsupported{})
 	if err == nil {
 		t.Fatalf("Expected error asking question, got nil")
 	}
@@ -339,8 +336,7 @@ func ExampleOracle_Ask_standardTextCompletion() {
 	// Basic request response text flow
 	c := client.NewDummyClient("A friendly LLM response!", nil)
 	o := goracle.NewOracle(c)
-	ctx := context.Background()
-	answer, err := o.Ask(ctx, "A user question")
+	answer, err := o.Ask("A user question")
 	if err != nil {
 		panic(err)
 	}
@@ -352,9 +348,8 @@ func ExampleOracle_Ask_withReferences() {
 	// Basic request response text flow with multi-modal references
 	c := client.NewDummyClient("Yes. There is a reference to swiss cheese in cheeseDocs/swiss.txt", nil)
 	o := goracle.NewOracle(c)
-	ctx := context.Background()
 	nonCheeseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	answer, err := o.Ask(ctx,
+	answer, err := o.Ask(
 		"My question for you is, do any of my references make mention of swiss cheese?",
 		"Some long chunk of text, that is notably non related",
 		goracle.File("invoice.txt"),
@@ -374,8 +369,7 @@ func ExampleOracle_Ask_withExamples() {
 	o := goracle.NewOracle(c)
 	o.GiveExample("Fear is the...", "mind killer")
 	o.GiveExample("With great power comes...", "great responsibility")
-	ctx := context.Background()
-	answer, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	answer, err := o.Ask("What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
 	}
@@ -389,15 +383,14 @@ func ExampleOracle_Ask_withConversationMemory() {
 	// this is the default and matches the typical chatbot experience
 	c := client.NewDummyClient("We talked about the answer to life, the universe, and everything", nil)
 	o := goracle.NewOracle(c)
-	ctx := context.Background()
 
 	// This is the default, but can be set manually
 	o.Remember()
-	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	_, err := o.Ask("What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
 	}
-	answer, err := o.Ask(ctx, "What have we already talked about?")
+	answer, err := o.Ask("What have we already talked about?")
 	if err != nil {
 		panic(err)
 	}
@@ -406,22 +399,35 @@ func ExampleOracle_Ask_withConversationMemory() {
 }
 
 func ExampleOracle_Ask_withoutConversationMemory() {
-	// For when you want the responses to be Stateless
+	// For when you want the responses to be Staskteless
 	// and not depend on the previous answers/examples
 	c := client.NewDummyClient("Nothing so far", nil)
 	o := goracle.NewOracle(c)
-	ctx := context.Background()
 
 	//
 	o.Forget()
-	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
+	_, err := o.Ask("What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
 	}
-	answer, err := o.Ask(ctx, "What have we already talked about?")
+	answer, err := o.Ask("What have we already talked about?")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(answer)
 	// Output: Nothing so far
+}
+
+func ExampleOracle_AskWithContext_withTimeout() {
+	// For when you want to limit the amount of time the LLM has to respond
+	c := client.NewDummyClient("A friendly LLM response!", nil)
+	o := goracle.NewOracle(c)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	answer, err := o.AskWithContext(ctx, "A user question")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+	// Output: A friendly LLM response!
 }

@@ -114,11 +114,14 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
-// Large Language Model. Ask massages the query and supporting references into a standardised format that
-// is relatively generalisable across models. It also handles the response from
-// the model and returns it in a way that is easy to consume. If the Oracle is
-// stateful, it manages that here.
-func (o *Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
+// Large Language Model. Ask massages the query and supporting references into a
+// standardised format that is relatively generalisable across models.
+func (o *Oracle) Ask(question string, references ...any) (string, error) {
+	return o.AskWithContext(context.Background(), question, references...)
+}
+
+// AskWithContext is similar to [*Oracle.Ask] but allows for a context to be passed in.
+func (o *Oracle) AskWithContext(ctx context.Context, question string, references ...any) (string, error) {
 	p := Prompt{
 		Purpose:       o.purpose,
 		InputHistory:  o.previousInputs,
@@ -210,4 +213,14 @@ func Image(i image.Image) []byte {
 		return []byte{}
 	}
 	return buf.Bytes()
+}
+
+// NewChatGPTOracle takes an OpenAI API token and sets up a new ChatGPT Oracle
+// with sensible defaults.
+func NewChatGPTOracle(token string) *Oracle {
+	return NewOracle(client.NewChatGPT(token))
+}
+
+func NewGoogleGeminiOracle() *Oracle {
+	return NewOracle(client.NewVertex())
 }

@@ -41,7 +41,7 @@ func TestOracleIntegration_ExamplesGuideOutput(t *testing.T) {
 			o := c.Oracle
 			o.GiveExample("2", "+++even+++")
 			o.GiveExample("3", "---odd---")
-			got, err := o.Ask(context.Background(), "6")
+			got, err := o.Ask("6")
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
 			}
@@ -61,7 +61,7 @@ func TestOracleIntegration_PurposeGuidesOutput(t *testing.T) {
 			o := c.Oracle
 			o.SetPurpose("You always answer questions with the number 42.")
 			question := "What is the meaning of life?"
-			answer, err := o.Ask(context.TODO(), question)
+			answer, err := o.Ask(question)
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
 			}
@@ -88,7 +88,7 @@ func TestOracleIntegration_RefersToDocuments(t *testing.T) {
 			}
 			defer f.Close()
 
-			answer, err := o.Ask(context.TODO(), "Can you repeat my two facts?",
+			answer, err := o.Ask("Can you repeat my two facts?",
 				"the sky is blue",
 				goracle.File(f.Name()),
 			)
@@ -119,9 +119,8 @@ func TestOracleIntegration_RefersToImages(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			ctx := context.Background()
 			o := c.Oracle
-			answer, err := o.Ask(ctx, "What species is this?", image)
+			answer, err := o.Ask("What species is this?", image)
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
 			}
@@ -135,8 +134,8 @@ func TestOracleIntegration_RefersToImages(t *testing.T) {
 
 func TestOpenAIClient_TextToSpeechandSpeechToVoice(t *testing.T) {
 	t.Parallel()
-	c := client.NewChatGPT(os.Getenv("OPENAI_API_KEY"))
 	ctx := context.Background()
+	c := client.NewChatGPT(os.Getenv("OPENAI_API_KEY"))
 	text := "hello world"
 	audio, err := c.CreateAudio(ctx, text)
 	if err != nil {

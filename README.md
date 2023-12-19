@@ -4,6 +4,12 @@
 
 ## Overview
 
+GOracle is a simple API for easy integration with AI models (ChatGPT, Gemini etc.) 
+
+```Golang
+import "github.com/mr-joshcrane/oracle"
+```
+
 GOracle is a convenience library designed to help Golang developers bring the power of (LLMs) into their Go applications. Our goal is to provide a straightforward and efficient experience for Go developers by offering a common API layer that abstracts the complexities of various LLM platforms down into the client layer, while providing a small stable interface.
 
 It's designed to be small, simple, and powerful!
@@ -26,10 +32,8 @@ The `Ask` method is the core function of GOracle. It allows developers to pose q
 ### Usage Example
 
 ```go
-ctx := context.Background()
-c := client.NewChatGPT("your-token-here")
-o := oracle.NewOracle(c)
-response, err := o(ctx, "What is the capital of France?")
+o := oracle.NewChatGPTOracle("your-token-here")
+response, err := o.Ask("What is the capital of France?")
 if err != nil {
     log.Fatal(err)
 }
@@ -54,12 +58,11 @@ References can enhance the quality of the LLM's responses by providing relevant 
 ### Reference Usage Example
 
 ```go
-ctx := context.Background()
 imageRef := // ... some image.Image object
 fileRef := oracle.File("example.txt")
 stringRef := "some big mess of text"
 
-response, err := oracleInstance.Ask(ctx, 
+response, err := o.Ask( 
     "Can you analyze the content of these references?", 
     imageRef, 
     fileRef,

@@ -32,7 +32,7 @@ func iterateOnReadme(i int, wg *sync.WaitGroup) {
 
 	generator := goracle.NewOracle(c)
 
-	response, err := generator.Ask(ctx,
+	response, err := generator.AskWithContext(ctx,
 		` I am editing my README.md file. I want to make it better, and I included the source code so you can read it.
 	  	Rewrite this README.md file. I will be piping it directly to a file, so please write it in a suitable style.
 		  Here are my requirements:
