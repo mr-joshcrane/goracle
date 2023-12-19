@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mr-joshcrane/goracle/client"
 )
@@ -61,21 +62,32 @@ type Oracle struct {
 	stateful        bool
 }
 
-// Options is a function that modifies the Oracle.
-type Option func(*Oracle) *Oracle
-
-func Stateful(*Oracle) *Oracle {
-	return &Oracle{
-		stateful: true,
-	}
+// Remember [Oracles Oracle] remember the conversation history and keep track
+// of the context of the conversation. This is the default behaviour. References
+// are not persisted between calls in order to keep the prompt size down.
+// If this behaviour is desired, you can pass the references with
+// oracle.GiveExample like so:
+// oracle.GiveExample(oracle.File("path/to/file", "<your preferred bot response>"))
+func (o *Oracle) Remember() *Oracle {
+	o.stateful = true
+	return o
 }
 
-func Stateless(*Oracle) *Oracle {
-	return &Oracle{
-		previousInputs:  []string{},
-		previousOutputs: []string{},
-		stateful:        false,
-	}
+// Forget [Oracles Oracle] forget the conversation history and do not keep
+// track of the context of the conversation. This is useful for when you want
+// to ask a single question without previous context affecting the answers.
+func (o *Oracle) Forget() *Oracle {
+	o.Reset()
+	o.stateful = false
+	return o
+}
+
+// Reset clears the Oracle's previous chat history
+// Useful for when you hit a context limit
+// Doesn't affect the Oracle's purpose, or whether it's stateful or not
+func (o *Oracle) Reset() {
+	o.previousInputs = []string{}
+	o.previousOutputs = []string{}
 }
 
 // NewOracle returns a new Oracle with sensible defaults.
@@ -94,13 +106,18 @@ func (o *Oracle) SetPurpose(purpose string) {
 
 // GiveExample adds an example to the list of examples. These examples used to guide the models
 // response. Quality of the examples is more important than quantity here.
+// Calling this method on a stateless Oracle will have no effect.
+// This allows for stateless oracles to still benefit from n-shot learning.
 func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.previousInputs = append(o.previousInputs, givenInput)
 	o.previousOutputs = append(o.previousOutputs, idealCompletion)
 }
 
 // Ask asks the Oracle a question, and returns the response from the underlying
-// Large Language Model.
+// Large Language Model. Ask massages the query and supporting references into a standardised format that
+// is relatively generalisable across models. It also handles the response from
+// the model and returns it in a way that is easy to consume. If the Oracle is
+// stateful, it manages that here.
 func (o *Oracle) Ask(ctx context.Context, question string, references ...any) (string, error) {
 	p := Prompt{
 		Purpose:       o.purpose,
@@ -139,30 +156,10 @@ func (o Oracle) completion(ctx context.Context, prompt Prompt) (io.Reader, error
 	return o.client.Completion(ctx, prompt)
 }
 
-// Reset clears the Oracle's previous chat history
-// Useful for when you hit a context limit
-func (o *Oracle) Reset() {
-	o.purpose = ""
-	o.previousInputs = []string{}
-	o.previousOutputs = []string{}
-}
-
-func Folder(root string) []byte {
-	contents := []byte{}
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info.IsDir() {
-			return nil
-		}
-		content := append(File(path), byte('\n'))
-		contents = append(contents, content...)
-		return nil
-	})
-	return contents
-}
-
+// A Reference helper that reads a file from disk and returns the contents as
+// an array of bytes. Content will be a snapshot of the file at the time of
+// calling. Consider calling inside the Ask method or using a closure to ensure
+// lazy evaluation if you're going to be editing read file in place.
 func File(path string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -171,6 +168,41 @@ func File(path string) []byte {
 	return data
 }
 
+// A Reference helper that takes a folder in a filesystem and returns the contents
+// of all files in that folder as an array of bytes. Content will be a snapshot
+// of the files at the time of calling. Call is recursive, so be careful with
+// what you include. Consider adding one of more filters to the includeFilter
+// such as ".go" to only include certain files or similar globs.
+func Folder(root string, includeFilter ...string) []byte {
+	contents := []byte{}
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		var filter bool
+		if len(includeFilter) != 0 {
+			filter = true
+		}
+		for _, f := range includeFilter {
+			if strings.Contains(info.Name(), f) {
+				filter = false
+			}
+		}
+		if !filter {
+			content := append(File(path), byte('\n'))
+			contents = append(contents, content...)
+		}
+		return nil
+	})
+	return contents
+}
+
+// A Reference helper that takes an image and returns it's contents as an array
+// of bytes. Currently encodes to PNGs to be passed to the upstream client.
+// Content will be a snapshot of the image at the time of calling.
 func Image(i image.Image) []byte {
 	buf := new(bytes.Buffer)
 	err := png.Encode(buf, i)

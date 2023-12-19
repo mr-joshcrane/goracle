@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 	if lastArg == "ALL" {
 		os.Exit(m.Run())
 	}
-	path := os.TempDir() + "/coverage.out"
+	path := "/tmp/goracle_coverage.out"
 	f, err := os.Create(path)
 	if err != nil {
 		fmt.Println(err)
@@ -112,7 +112,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 	t.Parallel()
 	o, c := createTestOracle("Hello World", nil)
 	o.GiveExample("An example that should be forgotten", "And the ideal response that should be forgotten")
-	o.SetPurpose("Setting a purpose that should be forgotten")
+	o.SetPurpose("Setting a purpose that should NOT be forgotten")
 	_, err := o.Ask(ctx(), "A question that should be forgotten")
 	if err != nil {
 		t.Errorf("Error asking question: %s", err)
@@ -123,6 +123,7 @@ func TestResetReturnsABlankOracle(t *testing.T) {
 		t.Errorf("Error asking question: %s", err)
 	}
 	want := goracle.Prompt{
+		Purpose:       "Setting a purpose that should NOT be forgotten",
 		InputHistory:  []string{},
 		OutputHistory: []string{},
 		Question:      "Hello World",
@@ -280,6 +281,29 @@ func TestFolderReference_ValidFolderReturnsByteContentsOfFiles(t *testing.T) {
 	}
 }
 
+func TestFolderReference_DirectoryContentsCanBeFiltered(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	for i := 0; i < 10; i++ {
+		var filepath string
+		if i%2 == 0 {
+			filepath = tempDir + fmt.Sprintf("/%d.even.txt", i)
+		} else {
+			filepath = tempDir + fmt.Sprintf("/%d.odd.txt", i)
+		}
+		err := os.WriteFile(filepath, []byte(fmt.Sprintf("i=%d", i)), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := goracle.Folder(tempDir, "even")
+	want := []byte("i=0\ni=2\ni=4\ni=6\ni=8\n")
+	if !cmp.Equal(got, want) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+
+}
+
 func TestFolderReference_InvalidFolderReturnsEmptyBytes(t *testing.T) {
 	t.Parallel()
 	got := goracle.Folder("invalid/path")
@@ -368,7 +392,7 @@ func ExampleOracle_Ask_withConversationMemory() {
 	ctx := context.Background()
 
 	// This is the default, but can be set manually
-	goracle.Stateful(o)
+	o.Remember()
 	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
@@ -389,7 +413,7 @@ func ExampleOracle_Ask_withoutConversationMemory() {
 	ctx := context.Background()
 
 	//
-	goracle.Stateless(o)
+	o.Forget()
 	_, err := o.Ask(ctx, "What is the answer to life, the universe, and everything?")
 	if err != nil {
 		panic(err)
