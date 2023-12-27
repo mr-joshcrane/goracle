@@ -103,6 +103,6 @@ func (o *Ollama) Completion(ctx context.Context, prompt Prompt) (io.Reader, erro
 	return strings.NewReader(answer), nil
 }
 
-func (o *Ollama) GenerateEmbedding(ctx context.Context, prompt Prompt) (float64, error) {
+func (o *Ollama) GenerateEmbedding(ctx context.Context, prompt Prompt) ([]float64, error) {
 	return ollama.GetEmbedding(o.Model, o.Endpoint, prompt)
 }

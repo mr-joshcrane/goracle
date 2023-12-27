@@ -34,7 +34,13 @@ func DoChatCompletion(model string, endpoint string, prompt Prompt) (string, err
 }
 
 func GetEmbedding(model string, endpoint string, prompt Prompt) ([]float64, error) {
-	body := NewChatCompletionRequest(model, prompt)
+	body := struct {
+		Model  string `json:"model"`
+		Prompt string `json:"prompt"`
+	}{
+		Model:  model,
+		Prompt: prompt.GetQuestion(),
+	}
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -55,8 +61,11 @@ func GetEmbedding(model string, endpoint string, prompt Prompt) ([]float64, erro
 	var embeddings struct {
 		Embeddings []float64 `json:"embeddings"`
 	}
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&embeddings)
+	data, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &embeddings)
 	if err != nil {
 		return nil, err
 	}
