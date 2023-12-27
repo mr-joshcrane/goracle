@@ -33,6 +33,36 @@ func DoChatCompletion(model string, endpoint string, prompt Prompt) (string, err
 	return ParseChatCompletionResponse(resp)
 }
 
+func GetEmbedding(model string, endpoint string, prompt Prompt) ([]float64, error) {
+	body := NewChatCompletionRequest(model, prompt)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	endpoint = fmt.Sprintf("%s/api/embeddings", endpoint)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama response status code: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	var embeddings struct {
+		Embeddings []float64 `json:"embeddings"`
+	}
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&embeddings)
+	if err != nil {
+		return nil, err
+	}
+	return embeddings.Embeddings, nil
+}
+
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
