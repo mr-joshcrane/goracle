@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mr-joshcrane/goracle/client/google"
+	"github.com/mr-joshcrane/goracle/client/ollama"
 	"github.com/mr-joshcrane/goracle/client/openai"
 )
 
@@ -78,4 +79,26 @@ func NewVertex() *Vertex {
 
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
 	return google.Completion(ctx, prompt)
+}
+
+// --- Ollama client
+
+type Ollama struct {
+	Model    string
+	Endpoint string
+}
+
+func NewOllama(model string, endpoint string) *Ollama {
+	return &Ollama{
+		Model:    model,
+		Endpoint: endpoint,
+	}
+}
+
+func (o *Ollama) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	answer, err := ollama.DoChatCompletion(o.Model, o.Endpoint, prompt)
+	if err != nil {
+		return nil, err
+	}
+	return strings.NewReader(answer), nil
 }

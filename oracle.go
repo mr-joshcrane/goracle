@@ -221,6 +221,11 @@ func NewChatGPTOracle(token string) *Oracle {
 	return NewOracle(client.NewChatGPT(token))
 }
 
+// NewGoogleGeminiOracle uses the
 func NewGoogleGeminiOracle() *Oracle {
 	return NewOracle(client.NewVertex())
+}
+
+func NewOllamaOracle(model string, endpoint string) *Oracle {
+	return NewOracle(client.NewOllama(model, endpoint))
 }
