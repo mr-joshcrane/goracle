@@ -7,7 +7,7 @@
 GOracle is a simple API for easy integration with AI models (ChatGPT, Gemini etc.) 
 
 ```Golang
-import "github.com/mr-joshcrane/oracle"
+import "github.com/mr-joshcrane/goracle"
 ```
 
 GOracle is a convenience library designed to help Golang developers bring the power of (LLMs) into their Go applications. Our goal is to provide a straightforward and efficient experience for Go developers by offering a common API layer that abstracts the complexities of various LLM platforms down into the client layer, while providing a small stable interface.
