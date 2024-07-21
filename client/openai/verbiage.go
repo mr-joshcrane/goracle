@@ -13,6 +13,8 @@ import (
 const (
 	GPT35Turbo = "gpt-3.5-turbo-1106"
 	GPT4       = "gpt-4-1106-preview"
+	GPT4o      = "gpt-4o"
+	GPT4oMini  = "gpt-4o-mini"
 )
 
 type TextCompletionRequest struct {
@@ -27,7 +29,7 @@ type TextCompletionResponse struct {
 }
 
 func textCompletion(ctx context.Context, token string, messages Messages) (io.Reader, error) {
-	req, err := CreateTextCompletionRequest(token, GPT4, messages)
+	req, err := CreateTextCompletionRequest(token, GPT4oMini, messages)
 	if err != nil {
 		return nil, err
 	}
