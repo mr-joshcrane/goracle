@@ -237,7 +237,7 @@ type GenerationConfig struct {
 }
 
 func CreateVertexTextCompletionRequest(token string, projectID string, messages []ChatMessage) (*http.Request, error) {
-	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-pro:streamGenerateContent", projectID)
+	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-pro-001:streamGenerateContent", projectID)
 	body := TextCompletionRequest{
 		Contents: messages,
 		GenerationConfig: GenerationConfig{
