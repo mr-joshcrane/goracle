@@ -39,7 +39,7 @@ func testMessages() openai.Messages {
 func TestCreateTextCompletionRequestHeaders(t *testing.T) {
 	t.Parallel()
 	messages := testMessages()
-	req, err := openai.CreateTextCompletionRequest("dummy-token-openai", openai.GPT4, messages)
+	req, err := openai.CreateTextCompletionRequest("dummy-token-openai", openai.GPT4o, messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
@@ -56,11 +56,11 @@ func TestCreateTextCompletionRequestHeaders(t *testing.T) {
 func TestCreateTextCompletionRequest(t *testing.T) {
 	t.Parallel()
 	messages := testMessages()
-	req, err := openai.CreateTextCompletionRequest("dummy-token-openai", openai.GPT4, messages)
+	req, err := openai.CreateTextCompletionRequest("dummy-token-openai", openai.GPT4o, messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
-	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}]}%v`, openai.GPT4, "\n")
+	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}]}%v`, openai.GPT4o, "\n")
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Errorf("Error reading request body: %s", err)

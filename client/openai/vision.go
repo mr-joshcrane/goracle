@@ -134,7 +134,7 @@ type VisionCompletionResponse struct {
 func CreateVisionRequest(token string, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(VisionRequest{
-		Model:     GPT4V,
+		Model:     GPT4o,
 		Messages:  messages,
 		MaxTokens: 300,
 	})
