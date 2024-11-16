@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -41,17 +42,31 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error
 
 type ChatGPT struct {
 	Token string
-	Model string
+	Model openai.ModelConfig
 }
 
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
+		Model: openai.Models["gpt-4o"],
 	}
 }
 
+func (c *ChatGPT) WithModel(model string) error {
+	m, ok := openai.Models[model]
+	if !ok {
+		supportedModels := make([]string, 0, len(openai.Models))
+		for k := range openai.Models {
+			supportedModels = append(supportedModels, k)
+		}
+		return fmt.Errorf("model %s not found. Supported models include: %s", model, strings.Join(supportedModels, ", "))
+	}
+	c.Model = m
+	return nil
+}
+
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return openai.Do(ctx, c.Token, prompt)
+	return openai.Do(ctx, c.Token, c.Model, prompt)
 }
 
 func (c *ChatGPT) CreateImage(ctx context.Context, prompt string) ([]byte, error) {
@@ -71,10 +86,16 @@ func (c *ChatGPT) CreateAudio(ctx context.Context, text string) ([]byte, error) 
 type Vertex struct {
 	Token     string
 	ProjectID string
+	Model     string //TODO: Model switching
 }
 
 func NewVertex() *Vertex {
 	return &Vertex{}
+}
+
+func (v *Vertex) WithModel(model string) error {
+	v.Model = model
+	return nil
 }
 
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {

@@ -13,6 +13,8 @@ import (
 const (
 	GPT4o     = "gpt-4o"
 	GPT4oMini = "gpt-4o-mini"
+	GPTo1     = "o1-preview"
+	GPTo1Mini = "o1-mini"
 )
 
 type TextCompletionRequest struct {
@@ -26,8 +28,11 @@ type TextCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func textCompletion(ctx context.Context, token string, messages Messages) (io.Reader, error) {
-	req, err := CreateTextCompletionRequest(token, GPT4oMini, messages)
+func textCompletion(ctx context.Context, token string, model ModelConfig, messages Messages) (io.Reader, error) {
+	if !model.SupportsSystemMessages {
+		messages = messages[1:]
+	}
+	req, err := CreateTextCompletionRequest(token, model.Name, messages)
 	if err != nil {
 		return nil, err
 	}

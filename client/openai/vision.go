@@ -131,10 +131,10 @@ type VisionCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func CreateVisionRequest(token string, messages Messages) (*http.Request, error) {
+func CreateVisionRequest(token string, model ModelConfig, messages Messages) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(VisionRequest{
-		Model:     GPT4o,
+		Model:     model.Name,
 		Messages:  messages,
 		MaxTokens: 300,
 	})
@@ -166,8 +166,11 @@ func ParseVisionResponse(resp *http.Response) (io.Reader, error) {
 	return answer, nil
 }
 
-func visionCompletion(ctx context.Context, token string, message Messages) (io.Reader, error) {
-	req, err := CreateVisionRequest(token, message)
+func visionCompletion(ctx context.Context, token string, model ModelConfig, message Messages) (io.Reader, error) {
+	if !model.SupportsVision {
+		return nil, fmt.Errorf("current model %s does not support visual input", model.Name)
+	}
+	req, err := CreateVisionRequest(token, model, message)
 	if err != nil {
 		return nil, err
 	}

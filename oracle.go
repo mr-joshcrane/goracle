@@ -229,3 +229,14 @@ func NewGoogleGeminiOracle() *Oracle {
 func NewOllamaOracle(model string, endpoint string) *Oracle {
 	return NewOracle(client.NewOllama(model, endpoint))
 }
+
+func (o *Oracle) WithModel(model string) error {
+	switch c := o.client.(type) {
+	case *client.ChatGPT:
+		return c.WithModel(model)
+	case *client.Vertex:
+		return c.WithModel(model)
+	default:
+		return fmt.Errorf("model switching not supported for %T", c)
+	}
+}
