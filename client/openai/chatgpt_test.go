@@ -256,7 +256,7 @@ func TestCreateVisionRequest(t *testing.T) {
 		t.Errorf("Error reading request body: %s", err)
 	}
 	got := string(data)
-	want := `{"model":"gpt-4-vision-preview","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}],"max_tokens":300}` + "\n"
+	want := `{"model":"gpt-4o","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}],"max_tokens":300}` + "\n"
 	if err != nil {
 		t.Errorf("Error unmarshalling request body: %s", err)
 	}

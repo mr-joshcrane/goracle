@@ -14,7 +14,7 @@ import (
 
 const (
 	DALLE3 = "dall-e-3"
-	GPT4V  = "gpt-4-vision-preview"
+	GPT4V  = "gpt-4o"
 )
 
 // Image Generation Capability

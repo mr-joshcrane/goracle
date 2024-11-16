@@ -237,7 +237,7 @@ type GenerationConfig struct {
 }
 
 func CreateVertexTextCompletionRequest(token string, projectID string, messages []ChatMessage) (*http.Request, error) {
-	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-pro-001:streamGenerateContent", projectID)
+	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-pro-002:streamGenerateContent", projectID)
 	body := TextCompletionRequest{
 		Contents: messages,
 		GenerationConfig: GenerationConfig{
@@ -264,7 +264,7 @@ func CreateVertexTextCompletionRequest(token string, projectID string, messages 
 
 func ParseVertexTextCompletionResponse(resp http.Response) (io.Reader, error) {
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("bad status code: %d, %s", resp.StatusCode, resp.Status)
 	}
 
 	defer resp.Body.Close()

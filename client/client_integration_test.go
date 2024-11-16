@@ -45,7 +45,7 @@ func TestOracleIntegration_ExamplesGuideOutput(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error asking question: %s", err)
 			}
-
+			got = strings.TrimSpace(got)
 			if got != "+++even+++" {
 				t.Fatal(cmp.Diff("+++even+++", got))
 			}
