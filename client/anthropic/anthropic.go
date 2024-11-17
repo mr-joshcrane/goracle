@@ -90,8 +90,6 @@ func Completion(ctx context.Context, token string, model ModelConfig, prompt Pro
 
 func createCompletionRequest(ctx context.Context, token string, model ModelConfig, prompt Prompt) (*http.Request, error) {
 	messages := createAnthropicMessages(prompt)
-	d, _ := json.Marshal(messages)
-	os.WriteFile("messages.json", d, 0644)
 	requestBody := map[string]any{
 		"model":      model.Name,
 		"system":     prompt.GetPurpose(),
