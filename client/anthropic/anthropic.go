@@ -59,7 +59,22 @@ func Authenticate() (token string, err error) {
 	return key, nil
 }
 
+func capabilityCheck(model ModelConfig, prompt Prompt) error {
+	if !model.SupportsVision {
+		for _, ref := range prompt.GetReferences() {
+			if isValidImage(ref) {
+				return fmt.Errorf("model %s does not support image references", model.Name)
+			}
+		}
+	}
+	return nil
+}
+
 func Completion(ctx context.Context, token string, model ModelConfig, prompt Prompt) (io.Reader, error) {
+	err := capabilityCheck(model, prompt)
+	if err != nil {
+		return nil, err
+	}
 	req, err := createCompletionRequest(ctx, token, model, prompt)
 	if err != nil {
 		return nil, err
@@ -75,10 +90,7 @@ func Completion(ctx context.Context, token string, model ModelConfig, prompt Pro
 }
 
 func createCompletionRequest(ctx context.Context, token string, model ModelConfig, prompt Prompt) (*http.Request, error) {
-
 	messages := createAnthropicMessages(prompt)
-	data, _ := json.Marshal(messages)
-	os.WriteFile("messages.json", data, 0644)
 	requestBody := map[string]any{
 		"model":      model.Name,
 		"max_tokens": 1024,

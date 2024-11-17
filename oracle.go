@@ -240,6 +240,8 @@ func (o *Oracle) WithModel(model string) error {
 		return c.WithModel(model)
 	case *client.Vertex:
 		return c.WithModel(model)
+	case *client.Anthropic:
+		return c.WithModel(model)
 	default:
 		return fmt.Errorf("model switching not supported for %T", c)
 	}
