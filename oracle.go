@@ -226,6 +226,10 @@ func NewGoogleGeminiOracle() *Oracle {
 	return NewOracle(client.NewVertex())
 }
 
+func NewAnthropicOracle(token string) *Oracle {
+	return NewOracle(client.NewAnthropic(token))
+}
+
 func NewOllamaOracle(model string, endpoint string) *Oracle {
 	return NewOracle(client.NewOllama(model, endpoint))
 }
@@ -235,6 +239,8 @@ func (o *Oracle) WithModel(model string) error {
 	case *client.ChatGPT:
 		return c.WithModel(model)
 	case *client.Vertex:
+		return c.WithModel(model)
+	case *client.Anthropic:
 		return c.WithModel(model)
 	default:
 		return fmt.Errorf("model switching not supported for %T", c)
