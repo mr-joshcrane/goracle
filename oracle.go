@@ -226,6 +226,10 @@ func NewGoogleGeminiOracle() *Oracle {
 	return NewOracle(client.NewVertex())
 }
 
+func NewAnthropicOracle(token string) *Oracle {
+	return NewOracle(client.NewAnthropic(token))
+}
+
 func NewOllamaOracle(model string, endpoint string) *Oracle {
 	return NewOracle(client.NewOllama(model, endpoint))
 }
