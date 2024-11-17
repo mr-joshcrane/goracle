@@ -86,20 +86,38 @@ func (c *ChatGPT) CreateAudio(ctx context.Context, text string) ([]byte, error) 
 type Vertex struct {
 	Token     string
 	ProjectID string
-	Model     string //TODO: Model switching
+	Model     google.ModelConfig
 }
 
 func NewVertex() *Vertex {
-	return &Vertex{}
+	return &Vertex{
+		Model: google.Models["GeminiPro"],
+	}
 }
 
 func (v *Vertex) WithModel(model string) error {
-	v.Model = model
+	m, ok := google.Models[model]
+	if !ok {
+		supportedModels := make([]string, 0, len(google.Models))
+		for k := range google.Models {
+			supportedModels = append(supportedModels, k)
+		}
+		return fmt.Errorf("model %s not found. Supported models include: %s", model, strings.Join(supportedModels, ", "))
+	}
+	v.Model = m
 	return nil
 }
 
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return google.Completion(ctx, prompt)
+	if v.ProjectID == "" || v.Token == "" {
+		project, token, err := google.Authenticate()
+		if err != nil {
+			return nil, err
+		}
+		v.ProjectID = project
+		v.Token = token
+	}
+	return google.Completion(ctx, v.Token, v.ProjectID, v.Model, prompt)
 }
 
 // --- Ollama client

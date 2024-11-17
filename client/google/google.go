@@ -100,8 +100,8 @@ func MessagesFromPrompt(prompt Prompt) []ChatMessage {
 	return messages
 }
 
-func textCompletion(ctx context.Context, token string, projectID string, messages []ChatMessage) (io.Reader, error) {
-	req, err := CreateVertexTextCompletionRequest(token, projectID, messages)
+func textCompletion(ctx context.Context, token string, projectID string, model ModelConfig, messages []ChatMessage) (io.Reader, error) {
+	req, err := CreateVertexTextCompletionRequest(token, projectID, model, messages)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +116,8 @@ func textCompletion(ctx context.Context, token string, projectID string, message
 	return answer, err
 }
 
-func visionCompletion(ctx context.Context, token string, projectID string, messages []ChatMessage) (io.Reader, error) {
-	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-pro-vision:streamGenerateContent", projectID)
+func visionCompletion(ctx context.Context, token string, projectID string, model ModelConfig, messages []ChatMessage) (io.Reader, error) {
+	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/%s/models/%s:streamGenerateContent", projectID, model.Provider, model.Name)
 	payload := VisualCompletionRequest{
 		GenerationConfig: GenerationConfig{
 			MaxOutputTokens: 1024,
@@ -203,21 +203,20 @@ func visionCompletion(ctx context.Context, token string, projectID string, messa
 	answer = strings.Trim(answer, " ")
 	return strings.NewReader(answer), nil
 }
-
-func Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	project, token, err := Authenticate()
-	if err != nil {
-		return nil, err
-	}
+func Completion(ctx context.Context, token string, projectID string, model ModelConfig, prompt Prompt) (io.Reader, error) {
+	// Use the passed in token and projectID
 	strategy := textCompletion
 	messages := MessagesFromPrompt(prompt)
-	for _, message := range messages {
-		if isPNG([]byte(message.Parts.Text)) {
-			strategy = visionCompletion
-			break
+
+	if model.SupportsVision {
+		for _, message := range messages {
+			if isPNG([]byte(message.Parts.Text)) {
+				strategy = visionCompletion
+				break
+			}
 		}
 	}
-	answer, err := strategy(ctx, token, project, messages)
+	answer, err := strategy(ctx, token, projectID, model, messages)
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +235,8 @@ type GenerationConfig struct {
 	TopK            int     `json:"topK"`
 }
 
-func CreateVertexTextCompletionRequest(token string, projectID string, messages []ChatMessage) (*http.Request, error) {
-	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-1.5-pro-002:streamGenerateContent", projectID)
+func CreateVertexTextCompletionRequest(token string, projectID string, model ModelConfig, messages []ChatMessage) (*http.Request, error) {
+	URI := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/%s/models/%s:streamGenerateContent", projectID, model.Provider, model.Name)
 	body := TextCompletionRequest{
 		Contents: messages,
 		GenerationConfig: GenerationConfig{
