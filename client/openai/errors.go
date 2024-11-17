@@ -26,13 +26,14 @@ func (e RateLimitError) Error() string {
 }
 
 type BadRequestError struct {
+	Reason       string
 	PromptTokens int
 	TotalTokens  int
 	TokenLimit   int
 }
 
 func (e BadRequestError) Error() string {
-	return fmt.Sprintf("Bad request. Requested %d tokens, limit is %d", e.PromptTokens, e.TokenLimit)
+	return fmt.Sprintf("Bad request. %s", e.Reason)
 }
 
 type rateLimit struct {
@@ -83,13 +84,17 @@ func ErrorBadRequest(r http.Response) error {
 			TotalTokens  int `json:"total_tokens"`
 		} `json:"usage"`
 	}{}
-
-	err := json.NewDecoder(r.Body).Decode(&usage)
+	data, err := json.Marshal(r.Body)
+	if err != nil {
+		return err
+	}
+	err = json.NewDecoder(r.Body).Decode(&usage)
 	if err != nil {
 		return err
 	}
 	defer r.Body.Close()
 	brqe := BadRequestError{
+		Reason:       string(data),
 		PromptTokens: 0,
 		TotalTokens:  0,
 		TokenLimit:   8192,

@@ -83,7 +83,7 @@ func MessageFromPrompt(prompt Prompt) Messages {
 	return messages
 }
 
-func Do(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
+func Do(ctx context.Context, token string, model ModelConfig, prompt Prompt) (io.Reader, error) {
 	strategy := textCompletion
 	refs := prompt.GetReferences()
 	for _, ref := range refs {
@@ -92,7 +92,7 @@ func Do(ctx context.Context, token string, prompt Prompt) (io.Reader, error) {
 		}
 	}
 	messages := MessageFromPrompt(prompt)
-	return strategy(ctx, token, messages)
+	return strategy(ctx, token, model, messages)
 }
 
 func addDefaultHeaders(token string, r *http.Request) *http.Request {

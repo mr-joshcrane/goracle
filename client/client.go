@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -41,17 +42,31 @@ func (d *Dummy) Completion(ctx context.Context, prompt Prompt) (io.Reader, error
 
 type ChatGPT struct {
 	Token string
-	Model string
+	Model openai.ModelConfig
 }
 
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
+		Model: openai.Models["gpt-4o"],
 	}
 }
 
+func (c *ChatGPT) WithModel(model string) error {
+	m, ok := openai.Models[model]
+	if !ok {
+		supportedModels := make([]string, 0, len(openai.Models))
+		for k := range openai.Models {
+			supportedModels = append(supportedModels, k)
+		}
+		return fmt.Errorf("model %s not found. Supported models include: %s", model, strings.Join(supportedModels, ", "))
+	}
+	c.Model = m
+	return nil
+}
+
 func (c *ChatGPT) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return openai.Do(ctx, c.Token, prompt)
+	return openai.Do(ctx, c.Token, c.Model, prompt)
 }
 
 func (c *ChatGPT) CreateImage(ctx context.Context, prompt string) ([]byte, error) {
@@ -71,14 +86,38 @@ func (c *ChatGPT) CreateAudio(ctx context.Context, text string) ([]byte, error) 
 type Vertex struct {
 	Token     string
 	ProjectID string
+	Model     google.ModelConfig
 }
 
 func NewVertex() *Vertex {
-	return &Vertex{}
+	return &Vertex{
+		Model: google.Models["GeminiPro"],
+	}
+}
+
+func (v *Vertex) WithModel(model string) error {
+	m, ok := google.Models[model]
+	if !ok {
+		supportedModels := make([]string, 0, len(google.Models))
+		for k := range google.Models {
+			supportedModels = append(supportedModels, k)
+		}
+		return fmt.Errorf("model %s not found. Supported models include: %s", model, strings.Join(supportedModels, ", "))
+	}
+	v.Model = m
+	return nil
 }
 
 func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
-	return google.Completion(ctx, prompt)
+	if v.ProjectID == "" || v.Token == "" {
+		project, token, err := google.Authenticate()
+		if err != nil {
+			return nil, err
+		}
+		v.ProjectID = project
+		v.Token = token
+	}
+	return google.Completion(ctx, v.Token, v.ProjectID, v.Model, prompt)
 }
 
 // --- Ollama client

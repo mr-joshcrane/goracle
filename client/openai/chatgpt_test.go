@@ -247,7 +247,7 @@ func TestErrorRateLimitsHitsRetryLimitsSignalsTryAfterRequestsReset(t *testing.T
 func TestCreateVisionRequest(t *testing.T) {
 	t.Parallel()
 	messages := testMessages()
-	req, err := openai.CreateVisionRequest("dummy-token-openai", messages)
+	req, err := openai.CreateVisionRequest("dummy-token-openai", openai.Models["gpt-4o"], messages)
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
