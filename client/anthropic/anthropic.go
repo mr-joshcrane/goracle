@@ -3,10 +3,8 @@ package anthropic
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -62,7 +60,8 @@ func Authenticate() (token string, err error) {
 func capabilityCheck(model ModelConfig, prompt Prompt) error {
 	if !model.SupportsVision {
 		for _, ref := range prompt.GetReferences() {
-			if isValidImage(ref) {
+			kind := detectDataKind(ref)
+			if kind == DataKindImage {
 				return fmt.Errorf("model %s does not support image references", model.Name)
 			}
 		}
@@ -91,8 +90,11 @@ func Completion(ctx context.Context, token string, model ModelConfig, prompt Pro
 
 func createCompletionRequest(ctx context.Context, token string, model ModelConfig, prompt Prompt) (*http.Request, error) {
 	messages := createAnthropicMessages(prompt)
+	d, _ := json.Marshal(messages)
+	os.WriteFile("messages.json", d, 0644)
 	requestBody := map[string]any{
 		"model":      model.Name,
+		"system":     prompt.GetPurpose(),
 		"max_tokens": 1024,
 		"messages":   messages,
 	}
@@ -117,12 +119,6 @@ func createCompletionRequest(ctx context.Context, token string, model ModelConfi
 	return req, nil
 }
 
-func isValidImage(ref []byte) bool {
-	reader := bytes.NewReader(ref)
-	_, _, err := image.Decode(reader)
-	return err == nil
-}
-
 type Message struct {
 	Role    Role `json:"role"`
 	Content any  `json:"content"`
@@ -137,20 +133,6 @@ type ImagePayload struct {
 	} `json:"source"`
 }
 
-func createImageContent(imageData []byte) ImagePayload {
-	return ImagePayload{
-		Type: "image",
-		Source: struct {
-			Type      string `json:"type"`
-			MediaType string `json:"media_type"`
-			Data      string `json:"data"`
-		}{
-			Type:      "base64",
-			MediaType: "image/jpeg",
-			Data:      base64.StdEncoding.EncodeToString(imageData),
-		},
-	}
-}
 func createAnthropicMessages(prompt Prompt) []Message {
 	messages := []Message{}
 	userHistory, assistantHistory := prompt.GetHistory()
@@ -159,14 +141,13 @@ func createAnthropicMessages(prompt Prompt) []Message {
 		messages = append(messages, Message{Role: "assistant", Content: assistantHistory[i]})
 	}
 	messages = append(messages, Message{Role: "user", Content: prompt.GetQuestion()})
+
 	for _, ref := range prompt.GetReferences() {
-		isImage := isValidImage(ref)
-		if !isImage {
-			messages = append(messages, Message{Role: "user", Content: string(ref)})
+		content, err := processReference(ref)
+		if err != nil {
 			continue
 		}
-		imagePayload := createImageContent(ref)
-		messages = append(messages, Message{Role: "user", Content: []ImagePayload{imagePayload}})
+		messages = append(messages, Message{Role: "user", Content: content})
 	}
 	return messages
 }
