@@ -166,7 +166,7 @@ func ParseVisionResponse(resp *http.Response) (io.Reader, error) {
 	return answer, nil
 }
 
-func visionCompletion(ctx context.Context, token string, model ModelConfig, message Messages) (io.Reader, error) {
+func visionCompletion(ctx context.Context, token string, model ModelConfig, message Messages, format ...string) (io.Reader, error) {
 	if !model.SupportsVision {
 		return nil, fmt.Errorf("current model %s does not support visual input", model.Name)
 	}

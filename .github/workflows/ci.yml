@@ -27,12 +27,15 @@ jobs:
       - name: Set up GCloud CLI
         uses: 'google-github-actions/setup-gcloud@v1'
       - run: |
+          VERTEX_API_KEY=$(gcloud auth print-access-token) &&
+          echo "::add-mask::$VERTEX_API_KEY" &&
           export VERTEX_API_KEY=$(gcloud auth print-access-token) && \
           export VERTEX_PROJECT=${{ secrets.VERTEX_PROJECT }} && \
           export && \
           go test -tags=integration ./...
         env: 
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   govulncheck:
     runs-on: ubuntu-latest
     steps:

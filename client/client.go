@@ -18,6 +18,7 @@ type Prompt interface {
 	GetHistory() ([]string, []string)
 	GetQuestion() string
 	GetReferences() [][]byte
+	GetResponseFormat() []string
 }
 
 // --- Dummy Client

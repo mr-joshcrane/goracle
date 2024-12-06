@@ -18,6 +18,7 @@ type Prompt interface {
 	GetHistory() ([]string, []string)
 	GetQuestion() string
 	GetReferences() [][]byte
+	GetResponseFormat() []string
 }
 
 type Messages []Message
@@ -84,6 +85,7 @@ func MessageFromPrompt(prompt Prompt) Messages {
 }
 
 func Do(ctx context.Context, token string, model ModelConfig, prompt Prompt) (io.Reader, error) {
+	format := prompt.GetResponseFormat()
 	strategy := textCompletion
 	refs := prompt.GetReferences()
 	for _, ref := range refs {
@@ -92,7 +94,7 @@ func Do(ctx context.Context, token string, model ModelConfig, prompt Prompt) (io
 		}
 	}
 	messages := MessageFromPrompt(prompt)
-	return strategy(ctx, token, model, messages)
+	return strategy(ctx, token, model, messages, format...)
 }
 
 func addDefaultHeaders(token string, r *http.Request) *http.Request {

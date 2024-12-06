@@ -18,8 +18,9 @@ const (
 )
 
 type TextCompletionRequest struct {
-	Model    string   `json:"model"`
-	Messages Messages `json:"messages"`
+	Model          string         `json:"model"`
+	Messages       Messages       `json:"messages"`
+	ResponseFormat map[string]any `json:"response_format"`
 }
 
 type TextCompletionResponse struct {
@@ -28,11 +29,11 @@ type TextCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func textCompletion(ctx context.Context, token string, model ModelConfig, messages Messages) (io.Reader, error) {
+func textCompletion(ctx context.Context, token string, model ModelConfig, messages Messages, format ...string) (io.Reader, error) {
 	if !model.SupportsSystemMessages {
 		messages = messages[1:]
 	}
-	req, err := CreateTextCompletionRequest(token, model.Name, messages)
+	req, err := CreateTextCompletionRequest(token, model.Name, messages, format...)
 	if err != nil {
 		return nil, err
 	}
@@ -43,11 +44,53 @@ func textCompletion(ctx context.Context, token string, model ModelConfig, messag
 	return ParseTextCompletionRequest(resp)
 }
 
-func CreateTextCompletionRequest(token string, model string, messages Messages) (*http.Request, error) {
+func parseResponseArg(arg string) (string, string) {
+	parts := strings.Split(arg, ":")
+	if len(parts) < 2 {
+		return arg, "A self-explanatory field"
+	}
+	return parts[0], parts[1]
+}
+
+func createFormatResponse(args ...string) map[string]any {
+	if len(args) < 1 {
+		return nil
+	}
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"response": map[string]any{
+				"type":  "array",
+				"items": map[string]any{},
+			},
+		},
+		"additionalProperties": false,
+	}
+
+	items := schema["properties"].(map[string]any)["response"].(map[string]any)["items"].(map[string]any)
+	for _, arg := range args {
+		name, description := parseResponseArg(arg)
+		items[name] = map[string]any{
+			"description": description,
+			"type":        "string",
+		}
+	}
+
+	return map[string]any{
+		"type": "json_schema",
+		"json_schema": map[string]any{
+			"name":   "response_schema",
+			"schema": schema,
+		},
+	}
+}
+
+func CreateTextCompletionRequest(token string, model string, messages Messages, outputs ...string) (*http.Request, error) {
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(TextCompletionRequest{
-		Model:    model,
-		Messages: messages,
+		Model:          model,
+		Messages:       messages,
+		ResponseFormat: createFormatResponse(outputs...),
 	})
 	if err != nil {
 		return nil, err
@@ -56,7 +99,8 @@ func CreateTextCompletionRequest(token string, model string, messages Messages) 
 	if err != nil {
 		return nil, err
 	}
-	req = addDefaultHeaders(token, req)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }
 
