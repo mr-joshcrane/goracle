@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mr-joshcrane/goracle/client/anthropic"
 	"github.com/mr-joshcrane/goracle/client/google"
 	"github.com/mr-joshcrane/goracle/client/ollama"
 	"github.com/mr-joshcrane/goracle/client/openai"
@@ -118,6 +119,44 @@ func (v *Vertex) Completion(ctx context.Context, prompt Prompt) (io.Reader, erro
 		v.Token = token
 	}
 	return google.Completion(ctx, v.Token, v.ProjectID, v.Model, prompt)
+}
+
+// --- Anthropic client
+
+type Anthropic struct {
+	Token string
+	Model anthropic.ModelConfig
+}
+
+func NewAnthropic(token string) *Anthropic {
+	return &Anthropic{
+		Token: token,
+		Model: anthropic.Models["ClaudeSonnet"],
+	}
+}
+
+func (a *Anthropic) WithModel(model string) error {
+	m, ok := anthropic.Models[model]
+	if !ok {
+		supportedModels := make([]string, 0, len(anthropic.Models))
+		for k := range anthropic.Models {
+			supportedModels = append(supportedModels, k)
+		}
+		return fmt.Errorf("model %s not found. Supported models include: %s", model, strings.Join(supportedModels, ", "))
+	}
+	a.Model = m
+	return nil
+}
+
+func (a *Anthropic) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	if a.Token == "" {
+		token, err := anthropic.Authenticate()
+		if err != nil {
+			return nil, err
+		}
+		a.Token = token
+	}
+	return anthropic.Completion(ctx, a.Token, a.Model, prompt)
 }
 
 // --- Ollama client

@@ -30,6 +30,10 @@ func testCases(t *testing.T) []testCase {
 			Oracle:      newVertexTestOracle(t),
 			Description: "VertexAI_Oracle",
 		},
+		{
+			Oracle:      goracle.NewAnthropicOracle(""),
+			Description: "Anthropic_Oracle",
+		},
 	}
 }
 
