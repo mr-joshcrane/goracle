@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
-	"os"
 	"strings"
 )
 
@@ -101,9 +99,6 @@ func CreateTextCompletionRequest(token string, model string, messages Messages, 
 	if err != nil {
 		return nil, err
 	}
-	req = addDefaultHeaders(token, req)
-	data, _ := httputil.DumpRequestOut(req, true)
-	os.WriteFile("request.txt", data, 0644)
 	return req, nil
 }
 

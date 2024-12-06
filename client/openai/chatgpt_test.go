@@ -60,7 +60,7 @@ func TestCreateTextCompletionRequest(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating request: %s", err)
 	}
-	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}]}%v`, openai.GPT4o, "\n")
+	want := fmt.Sprintf(`{"model":"%s","messages":[{"role":"system","content":"A test purpose"},{"role":"user","content":"GivenInput"},{"role":"assistant","content":"IdealOutput"},{"role":"user","content":"GivenInput2"},{"role":"assistant","content":"IdealOutput2"},{"role":"user","content":"A test question"},{"role":"user","content":"Reference 1: page1"},{"role":"user","content":"Reference 2: page2"}],"response_format":null}%v`, openai.GPT4o, "\n")
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		t.Errorf("Error reading request body: %s", err)
