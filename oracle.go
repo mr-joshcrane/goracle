@@ -18,11 +18,12 @@ import (
 // that are ideal for Large Language Models. This is the abstraction we will pass
 // through to the client library so it can be handled appropriately
 type Prompt struct {
-	Purpose       string
-	InputHistory  []string
-	OutputHistory []string
-	References    [][]byte
-	Question      string
+	Purpose        string
+	InputHistory   []string
+	OutputHistory  []string
+	References     [][]byte
+	Question       string
+	ResponseFormat []string
 }
 
 // GetPurpose returns the purpose of the prompt, which frames the models response.
@@ -45,6 +46,10 @@ func (p Prompt) GetReferences() [][]byte {
 	return p.References
 }
 
+func (p Prompt) GetResponseFormat() []string {
+	return p.ResponseFormat
+}
+
 // LanguageModel is an interface that abstracts a concrete implementation of our
 // language model API call.
 type LanguageModel interface {
@@ -59,6 +64,7 @@ type Oracle struct {
 	previousInputs  []string
 	previousOutputs []string
 	client          LanguageModel
+	responseFormat  []string
 	stateful        bool
 }
 
@@ -113,6 +119,13 @@ func (o *Oracle) GiveExample(givenInput string, idealCompletion string) {
 	o.previousOutputs = append(o.previousOutputs, idealCompletion)
 }
 
+func (o *Oracle) SetResponseFormat(fieldname, description string) {
+	if o.responseFormat == nil {
+		o.responseFormat = []string{}
+	}
+	o.responseFormat = append(o.responseFormat, fmt.Sprintf("%s:%s", fieldname, description))
+}
+
 // Ask asks the Oracle a question, and returns the response from the underlying
 // Large Language Model. Ask massages the query and supporting references into a
 // standardised format that is relatively generalisable across models.
@@ -123,10 +136,11 @@ func (o *Oracle) Ask(question string, references ...any) (string, error) {
 // AskWithContext is similar to [*Oracle.Ask] but allows for a context to be passed in.
 func (o *Oracle) AskWithContext(ctx context.Context, question string, references ...any) (string, error) {
 	p := Prompt{
-		Purpose:       o.purpose,
-		InputHistory:  o.previousInputs,
-		OutputHistory: o.previousOutputs,
-		Question:      question,
+		Purpose:        o.purpose,
+		InputHistory:   o.previousInputs,
+		OutputHistory:  o.previousOutputs,
+		Question:       question,
+		ResponseFormat: o.responseFormat,
 	}
 	for _, reference := range references {
 		switch r := reference.(type) {
