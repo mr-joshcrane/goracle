@@ -99,6 +99,8 @@ func CreateTextCompletionRequest(token string, model string, messages Messages, 
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }
 
