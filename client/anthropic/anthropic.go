@@ -93,7 +93,7 @@ func createCompletionRequest(ctx context.Context, token string, model ModelConfi
 	requestBody := map[string]any{
 		"model":      model.Name,
 		"system":     prompt.GetPurpose(),
-		"max_tokens": 1024,
+		"max_tokens": model.MaxTokens,
 		"messages":   messages,
 	}
 
