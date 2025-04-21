@@ -50,7 +50,7 @@ type ChatGPT struct {
 func NewChatGPT(token string) *ChatGPT {
 	return &ChatGPT{
 		Token: token,
-		Model: openai.Models["gpt-4o"],
+		Model: openai.Models["gpt-4.1"],
 	}
 }
 

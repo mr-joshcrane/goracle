@@ -7,6 +7,11 @@ type ModelConfig struct {
 }
 
 var Models = map[string]ModelConfig{
+	"gpt-4.1": {
+		Name:                   "gpt-4.1",
+		SupportsSystemMessages: true,
+		SupportsVision:         true,
+	},
 	"gpt-4o": {
 		Name:                   "gpt-4o",
 		SupportsSystemMessages: true,
