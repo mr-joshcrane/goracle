@@ -1,10 +1,10 @@
 module github.com/mr-joshcrane/goracle
 
-go 1.21
+go 1.24
 
-require github.com/google/go-cmp v0.6.0
+require github.com/google/go-cmp v0.7.0
 
-require golang.org/x/tools v0.16.1
+require golang.org/x/tools v0.32.0
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
