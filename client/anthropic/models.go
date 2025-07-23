@@ -5,25 +5,46 @@ type ModelConfig struct {
 	Name           string
 	SupportsVision bool
 	Description    string
-	MaxTokens int
+	MaxTokens      int
 }
 
 var Models = map[string]ModelConfig{
-	"ClaudeSonnet": {
-		Name:           "claude-3-5-sonnet-latest",
+	// "ClaudeSonnet": {
+	// 	Name:           "claude-3-5-sonnet-latest",
+	// 	SupportsVision: true,
+	// 	MaxTokens: 8192,
+	// 	Description: `The upgraded Claude 3.5 Sonnet is now state-of-the-art
+	// 								for a variety of tasks including real-world software engineering,
+	// 								enhanced agentic capabilities, and computer use.`,
+	// },
+	"ClaudeOpus4": {
+		Name:           "claude-opus-4-20250514",
 		SupportsVision: true,
-		MaxTokens: 8192,
-		Description: `The upgraded Claude 3.5 Sonnet is now state-of-the-art 
-									for a variety of tasks including real-world software engineering,
-									enhanced agentic capabilities, and computer use.`,
+		MaxTokens:      64000,
+		Description:    "Claude Opus 4 is the latest model with advanced capabilities and a large context window.",
 	},
-	"ClaudeHaiku": {
-		Provider:       "anthropic",
-		Name:           "claude-3-5-haiku-latest",
-		SupportsVision: false,
-		MaxTokens: 8192,
-		Description: `Claude 3 Haiku is Anthropic's fastest vision and text model 
-									for near-instant responses to simple queries, meant for seamless
-									AI experiences mimicking human interactions.`,
+	"ClaudeSonnet4": {
+		Name:           "claude-sonnet-4-20250514",
+		SupportsVision: true,
+		MaxTokens:      64000,
+		Description:    "Claude Sonnet 4 is designed for complex reasoning tasks with a large context window.",
+	},
+	"ClaudeSonnet3_7": {
+		Name:           "claude-3-7-sonnet-20250219",
+		SupportsVision: true,
+		MaxTokens:      64000,
+		Description:    "Claude Sonnet 3.7 is optimized for advanced reasoning and complex tasks.",
+	},
+	"ClaudeSonnet3_5": {
+		Name:           "claude-3-5-sonnet-20241022",
+		SupportsVision: true,
+		MaxTokens:      64000,
+		Description:    "Claude Sonnet 3.5 (New) is a versatile model with enhanced capabilities for various tasks.",
+	},
+	"ClaudeHaiku3_5": {
+		Name:           "claude-3-5-haiku-20241022",
+		SupportsVision: true,
+		MaxTokens:      64000,
+		Description:    "Claude Haiku 3.5 is designed for tasks requiring concise and efficient responses.",
 	},
 }
