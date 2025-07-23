@@ -9,14 +9,7 @@ type ModelConfig struct {
 }
 
 var Models = map[string]ModelConfig{
-	// "ClaudeSonnet": {
-	// 	Name:           "claude-3-5-sonnet-latest",
-	// 	SupportsVision: true,
-	// 	MaxTokens: 8192,
-	// 	Description: `The upgraded Claude 3.5 Sonnet is now state-of-the-art
-	// 								for a variety of tasks including real-world software engineering,
-	// 								enhanced agentic capabilities, and computer use.`,
-	// },
+
 	"ClaudeOpus4": {
 		Name:           "claude-opus-4-20250514",
 		SupportsVision: true,
