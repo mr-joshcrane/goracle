@@ -132,7 +132,7 @@ type Anthropic struct {
 func NewAnthropic(token string) *Anthropic {
 	return &Anthropic{
 		Token: token,
-		Model: anthropic.Models["ClaudeSonnet"],
+		Model: anthropic.Models["ClaudeSonnet3_7"],
 	}
 }
 

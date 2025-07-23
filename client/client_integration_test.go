@@ -23,16 +23,16 @@ type testCase struct {
 func testCases(t *testing.T) []testCase {
 	return []testCase{
 		{
+			Oracle:      goracle.NewAnthropicOracle(""),
+			Description: "Anthropic_Oracle",
+		},
+		{
 			Oracle:      newTestOracle(t),
 			Description: "OpenAI_Oracle",
 		},
 		{
 			Oracle:      newVertexTestOracle(t),
 			Description: "VertexAI_Oracle",
-		},
-		{
-			Oracle:      goracle.NewAnthropicOracle(""),
-			Description: "Anthropic_Oracle",
 		},
 	}
 }
