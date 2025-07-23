@@ -45,7 +45,7 @@ type Anthropic struct {
 func NewAnthropic(token string) *Anthropic {
 	return &Anthropic{
 		Token: token,
-		Model: Models["ClaudeSonnet"],
+		Model: Models["ClaudeSonnet4"],
 	}
 }
 

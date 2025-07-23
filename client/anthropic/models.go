@@ -9,7 +9,6 @@ type ModelConfig struct {
 }
 
 var Models = map[string]ModelConfig{
-
 	"ClaudeOpus4": {
 		Name:           "claude-opus-4-20250514",
 		SupportsVision: true,
