@@ -248,6 +248,19 @@ func NewOllamaOracle(model string, endpoint string) *Oracle {
 	return NewOracle(client.NewOllama(model, endpoint))
 }
 
+// NewBedrockOracle creates an Oracle using a Bedrock foundation model ID
+// Use this for models that support direct invocation (e.g., "anthropic.claude-3-5-sonnet-20241022-v2:0")
+func NewBedrockOracle(foundationModelId string) *Oracle {
+	return NewOracle(client.NewBedrock(foundationModelId))
+}
+
+// NewBedrockOracleWithInferenceProfile creates an Oracle using a Bedrock inference profile ARN
+// Use this for models that require an inference profile (e.g., "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abcdef123456")
+func NewBedrockOracleWithInferenceProfile(inferenceProfileArn string) *Oracle {
+	bedrockClient := client.NewBedrockWithInferenceProfile(inferenceProfileArn)
+	return NewOracle(bedrockClient)
+}
+
 func (o *Oracle) WithModel(model string) error {
 	switch c := o.client.(type) {
 	case *client.ChatGPT:
@@ -255,6 +268,8 @@ func (o *Oracle) WithModel(model string) error {
 	case *client.Vertex:
 		return c.WithModel(model)
 	case *client.Anthropic:
+		return c.WithModel(model)
+	case *client.Bedrock:
 		return c.WithModel(model)
 	default:
 		return fmt.Errorf("model switching not supported for %T", c)

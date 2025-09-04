@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mr-joshcrane/goracle/client/anthropic"
+	"github.com/mr-joshcrane/goracle/client/bedrock"
 	"github.com/mr-joshcrane/goracle/client/google"
 	"github.com/mr-joshcrane/goracle/client/ollama"
 	"github.com/mr-joshcrane/goracle/client/openai"
@@ -158,6 +159,40 @@ func (a *Anthropic) Completion(ctx context.Context, prompt Prompt) (io.Reader, e
 		a.Token = token
 	}
 	return anthropic.Completion(ctx, a.Token, a.Model, prompt)
+}
+
+// --- Bedrock client
+
+type Bedrock struct {
+	ModelIdentifier string
+}
+
+func NewBedrock(modelIdentifier string) *Bedrock {
+	return &Bedrock{
+		ModelIdentifier: modelIdentifier,
+	}
+}
+
+func NewBedrockWithInferenceProfile(inferenceProfileArn string) *Bedrock {
+	return &Bedrock{
+		ModelIdentifier: inferenceProfileArn,
+	}
+}
+
+func (b *Bedrock) WithModel(modelName string) error {
+	bedrockClient := bedrock.NewBedrock(b.ModelIdentifier)
+	err := bedrockClient.WithModel(modelName)
+	if err != nil {
+		return err
+	}
+	// Update our model identifier to the new one
+	b.ModelIdentifier = bedrockClient.ModelIdentifier
+	return nil
+}
+
+func (b *Bedrock) Completion(ctx context.Context, prompt Prompt) (io.Reader, error) {
+	bedrockClient := bedrock.NewBedrock(b.ModelIdentifier)
+	return bedrockClient.Completion(ctx, prompt)
 }
 
 // --- Ollama client
