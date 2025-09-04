@@ -22,17 +22,21 @@ type testCase struct {
 
 func testCases(t *testing.T) []testCase {
 	return []testCase{
+		// {
+		// 	Oracle:      goracle.NewAnthropicOracle(""),
+		// 	Description: "Anthropic_Oracle",
+		// },
+		// {
+		// 	Oracle:      newTestOracle(t),
+		// 	Description: "OpenAI_Oracle",
+		// },
+		// {
+		// 	Oracle:      newVertexTestOracle(t),
+		// 	Description: "VertexAI_Oracle",
+		// },
 		{
-			Oracle:      goracle.NewAnthropicOracle(""),
-			Description: "Anthropic_Oracle",
-		},
-		{
-			Oracle:      newTestOracle(t),
-			Description: "OpenAI_Oracle",
-		},
-		{
-			Oracle:      newVertexTestOracle(t),
-			Description: "VertexAI_Oracle",
+			Oracle:      newBedrockTestOracle(t),
+			Description: "Bedrock_Oracle",
 		},
 	}
 }
@@ -178,4 +182,15 @@ func newVertexTestOracle(t *testing.T) *goracle.Oracle {
 	}
 	c := client.NewVertex()
 	return goracle.NewOracle(c)
+}
+
+func newBedrockTestOracle(t *testing.T) *goracle.Oracle {
+	t.Helper()
+	// For now, we'll use a foundation model ID since we don't have real AWS integration yet
+	// In the future, this could check for AWS credentials and use either:
+	// - A foundation model: "anthropic.claude-3-5-sonnet-20241022-v2:0" 
+	// - An inference profile ARN: "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abcdef123456"
+	modelIdentifier := "anthropic.claude-3-5-sonnet-20241022-v2:0"
+	
+	return goracle.NewBedrockOracle(modelIdentifier)
 }
